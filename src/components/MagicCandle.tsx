@@ -6,7 +6,7 @@ import { Sparkles, Environment, Float } from "@react-three/drei";
 import * as THREE from "three";
 
 function CandleMesh() {
-  const flameRef = useRef<THREE.Mesh>(null);
+  const flameRef = useRef<THREE.Mesh | null>(null);
 
   useFrame((state) => {
     if (flameRef.current) {
