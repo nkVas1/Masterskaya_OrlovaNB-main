@@ -122,8 +122,10 @@ function Rig() {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    // Простейшая проверка на мобильное устройство
-    setIsMobile(/Android|iPhone/i.test(navigator.userAgent));
+    // Простейшая проверка на мобильное устройство (с проверкой window для SSR)
+    if (typeof window !== 'undefined') {
+      setIsMobile(/Android|iPhone/i.test(navigator.userAgent));
+    }
   }, []);
 
   useFrame((state) => {
