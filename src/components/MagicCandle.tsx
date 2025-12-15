@@ -52,11 +52,11 @@ function FadeInScale({
   return <group ref={groupRef}>{children}</group>;
 }
 
-// --- МАГИЧЕСКИЕ ЧАСТИЦЫ-ЗВЁЗДЫ С РАВНОМЕРНЫМ РАССЕИВАНИЕМ ---
+// --- КОМПАКТНЫЕ ЗВЁЗДНЫЕ ЧАСТИЦЫ С ГРАДИЕНТНЫМ СВЕЧЕНИЕМ ---
 function CustomSparkles({ 
   count = 50, 
   color = "#FFD700",
-  size = 0.05,
+  size = 0.02,
   spread = 5,
   speed = 0.3,
   position = [0, 0, 0] as [number, number, number]
@@ -78,13 +78,13 @@ function CustomSparkles({
         (Math.random() - 0.5) * spread
       ] as [number, number, number],
       velocity: [
-        (Math.random() - 0.5) * 0.02,
-        (Math.random() - 0.5) * 0.02,
-        (Math.random() - 0.5) * 0.02
+        (Math.random() - 0.5) * 0.015,
+        (Math.random() - 0.5) * 0.015,
+        (Math.random() - 0.5) * 0.015
       ] as [number, number, number],
-      scale: 0.6 + Math.random() * 0.7,
+      scale: 0.7 + Math.random() * 0.6,
       phase: Math.random() * Math.PI * 2,
-      flickerSpeed: 0.8 + Math.random() * 0.4
+      flickerSpeed: 0.9 + Math.random() * 0.3
     }));
   }, [count, spread]);
 
@@ -95,10 +95,10 @@ function CustomSparkles({
       groupRef.current.children.forEach((child, i) => {
         const particle = particles[i];
         
-        // Хаотичное плавающее движение как раньше
-        const offsetX = particle.initialPos[0] + Math.sin(t * particle.flickerSpeed + particle.phase) * 0.3;
-        const offsetY = particle.initialPos[1] + Math.cos(t * particle.flickerSpeed * 0.7 + particle.phase) * 0.3;
-        const offsetZ = particle.initialPos[2] + Math.sin(t * particle.flickerSpeed * 0.5 + particle.phase) * 0.2;
+        // Плавающее движение
+        const offsetX = particle.initialPos[0] + Math.sin(t * particle.flickerSpeed + particle.phase) * 0.25;
+        const offsetY = particle.initialPos[1] + Math.cos(t * particle.flickerSpeed * 0.8 + particle.phase) * 0.25;
+        const offsetZ = particle.initialPos[2] + Math.sin(t * particle.flickerSpeed * 0.6 + particle.phase) * 0.18;
         
         child.position.set(
           offsetX + particle.velocity[0] * t,
@@ -106,44 +106,27 @@ function CustomSparkles({
           offsetZ + particle.velocity[2] * t
         );
         
-        // Границы - возврат частиц в зону
-        if (Math.abs(child.position.x) > spread * 0.7) {
-          particle.velocity[0] *= -1;
-        }
-        if (Math.abs(child.position.y) > spread * 0.7) {
-          particle.velocity[1] *= -1;
-        }
-        if (Math.abs(child.position.z) > spread * 0.7) {
-          particle.velocity[2] *= -1;
-        }
+        // Отражение от границ
+        if (Math.abs(child.position.x) > spread * 0.6) particle.velocity[0] *= -1;
+        if (Math.abs(child.position.y) > spread * 0.6) particle.velocity[1] *= -1;
+        if (Math.abs(child.position.z) > spread * 0.6) particle.velocity[2] *= -1;
         
-        // Мерцание интенсивности
+        // Мерцание с градацией по слоям
         if (child instanceof THREE.Group) {
-          child.children.forEach((sphere, idx) => {
-            if (sphere instanceof THREE.Mesh && sphere.material) {
-              const mat = sphere.material as THREE.MeshBasicMaterial;
-              const flicker = 0.7 + Math.sin(t * 3 * particle.flickerSpeed + particle.phase) * 0.3;
+          child.children.forEach((mesh, idx) => {
+            if (mesh instanceof THREE.Mesh && mesh.material) {
+              const mat = mesh.material as THREE.MeshBasicMaterial;
+              const baseFlicker = 0.75 + Math.sin(t * 2.5 * particle.flickerSpeed + particle.phase) * 0.25;
               
-              if (idx === 0) {
-                // Пустая точка в центре - слабее
-                mat.opacity = 0.3 * flicker;
-              } else if (idx === 1) {
-                // Плотное кольцо вокруг центра
-                mat.opacity = 0.85 * flicker;
-              } else if (idx === 2) {
-                // Среднее свечение
-                mat.opacity = 0.5 * flicker;
-              } else {
-                // Внешнее рассеивание
-                mat.opacity = 0.2 * flicker;
-              }
+              // Градиентное затухание от центра к краям
+              const opacities = [0.25, 0.95, 0.45, 0.18, 0.08]; // 5 слоёв
+              mat.opacity = opacities[idx] * baseFlicker;
             }
           });
         }
       });
       
-      // Медленное вращение всей группы
-      groupRef.current.rotation.y = t * 0.05;
+      groupRef.current.rotation.y = t * 0.04;
     }
   });
 
@@ -151,55 +134,68 @@ function CustomSparkles({
     <group ref={groupRef} position={position}>
       {particles.map((particle, i) => (
         <group key={i} position={particle.initialPos}>
-          {/* Пустая точка в центре - низкая плотность */}
+          {/* Слой 1: Слабая пустота в центре */}
           <mesh>
-            <sphereGeometry args={[size * particle.scale * 0.3, 8, 8]} />
+            <sphereGeometry args={[size * particle.scale * 0.2, 8, 8]} />
             <meshBasicMaterial 
               color={color}
               transparent
-              opacity={0.3}
+              opacity={0.25}
               toneMapped={false}
               depthWrite={false}
               blending={THREE.AdditiveBlending}
             />
           </mesh>
           
-          {/* Плотное яркое кольцо - основное тело частицы */}
+          {/* Слой 2: Яркое компактное ядро */}
           <mesh>
-            <ringGeometry args={[size * particle.scale * 0.4, size * particle.scale * 1.2, 16]} />
+            <sphereGeometry args={[size * particle.scale * 0.6, 12, 12]} />
             <meshBasicMaterial 
               color={color}
               transparent
-              opacity={0.85}
+              opacity={0.95}
               toneMapped={false}
               depthWrite={false}
-              side={THREE.DoubleSide}
+              blending={THREE.AdditiveBlending}
             />
           </mesh>
           
-          {/* Средний слой рассеивания */}
+          {/* Слой 3: Первое рассеивание */}
           <mesh>
-            <sphereGeometry args={[size * particle.scale * 2, 12, 12]} />
+            <sphereGeometry args={[size * particle.scale * 1.5, 12, 12]} />
             <meshBasicMaterial 
               color={color}
               transparent
-              opacity={0.5}
+              opacity={0.45}
               toneMapped={false}
-              blending={THREE.AdditiveBlending}
               depthWrite={false}
+              blending={THREE.AdditiveBlending}
             />
           </mesh>
           
-          {/* Внешнее мягкое рассеивание - эффект "ауры" */}
+          {/* Слой 4: Среднее затухание */}
           <mesh>
-            <sphereGeometry args={[size * particle.scale * 4, 12, 12]} />
+            <sphereGeometry args={[size * particle.scale * 2.8, 16, 16]} />
             <meshBasicMaterial 
               color={color}
               transparent
-              opacity={0.2}
+              opacity={0.18}
               toneMapped={false}
-              blending={THREE.AdditiveBlending}
               depthWrite={false}
+              blending={THREE.AdditiveBlending}
+            />
+          </mesh>
+          
+          {/* Слой 5: Мягкое внешнее гало (fade edge) */}
+          <mesh>
+            <sphereGeometry args={[size * particle.scale * 4.5, 16, 16]} />
+            <meshBasicMaterial 
+              color={color}
+              transparent
+              opacity={0.08}
+              toneMapped={false}
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
             />
           </mesh>
         </group>
@@ -659,24 +655,24 @@ export default function MagicCandleScene() {
         
         <ResponsiveCandleGroup />
         
-        {/* Золотые частицы - солнечное сияние */}
+        {/* Золотые частицы - компактные звёзды */}
         <CustomSparkles 
-          count={90} 
+          count={110} 
           color="#FFD700" 
-          size={0.035} 
+          size={0.018} 
           spread={8} 
-          speed={0.35}
-          position={[0, 0.5, 0.5]}
+          speed={0.32}
+          position={[0, 0.4, 0.3]}
         />
         
-        {/* Фиолетовая мистическая пыль - тонкие звёздочки */}
+        {/* Фиолетовая мистическая пыль - микрочастицы */}
         <CustomSparkles 
-          count={65} 
-          color="#8b5cf6" 
-          size={0.012} 
+          count={80} 
+          color="#9b6cf6" 
+          size={0.008} 
           spread={6} 
-          speed={0.18}
-          position={[0, 0.2, -0.5]}
+          speed={0.2}
+          position={[0, 0.1, -0.6]}
         />
         
         <CinematicRig />
