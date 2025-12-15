@@ -52,7 +52,7 @@ function FadeInScale({
   return <group ref={groupRef}>{children}</group>;
 }
 
-// --- ПРОФЕССИОНАЛЬНЫЕ КИНЕМАТОГРАФИЧНЫЕ ЧАСТИЦЫ С РАЗМЫТИЕМ ---
+// --- КИНЕМАТОГРАФИЧНЫЕ ЧАСТИЦЫ С 11 СЛОЯМИ ПЛАВНОГО ЗАТУХАНИЯ ---
 function CustomSparkles({ 
   count = 50, 
   color = "#FFD700",
@@ -78,13 +78,13 @@ function CustomSparkles({
         (Math.random() - 0.5) * spread
       ] as [number, number, number],
       velocity: [
-        (Math.random() - 0.5) * 0.009,
-        (Math.random() - 0.5) * 0.009,
-        (Math.random() - 0.5) * 0.009
+        (Math.random() - 0.5) * 0.01,
+        (Math.random() - 0.5) * 0.01,
+        (Math.random() - 0.5) * 0.01
       ] as [number, number, number],
-      scale: 0.7 + Math.random() * 0.6,
+      scale: 0.65 + Math.random() * 0.7,
       phase: Math.random() * Math.PI * 2,
-      flickerSpeed: 0.75 + Math.random() * 0.45
+      flickerSpeed: 0.8 + Math.random() * 0.4
     }));
   }, [count, spread]);
 
@@ -95,9 +95,9 @@ function CustomSparkles({
       groupRef.current.children.forEach((child, i) => {
         const particle = particles[i];
         
-        const offsetX = particle.initialPos[0] + Math.sin(t * particle.flickerSpeed + particle.phase) * 0.18;
-        const offsetY = particle.initialPos[1] + Math.cos(t * particle.flickerSpeed * 0.7 + particle.phase) * 0.18;
-        const offsetZ = particle.initialPos[2] + Math.sin(t * particle.flickerSpeed * 0.5 + particle.phase) * 0.12;
+        const offsetX = particle.initialPos[0] + Math.sin(t * particle.flickerSpeed + particle.phase) * 0.2;
+        const offsetY = particle.initialPos[1] + Math.cos(t * particle.flickerSpeed * 0.75 + particle.phase) * 0.2;
+        const offsetZ = particle.initialPos[2] + Math.sin(t * particle.flickerSpeed * 0.55 + particle.phase) * 0.14;
         
         child.position.set(
           offsetX + particle.velocity[0] * t,
@@ -109,174 +109,69 @@ function CustomSparkles({
         if (Math.abs(child.position.y) > spread * 0.6) particle.velocity[1] *= -1;
         if (Math.abs(child.position.z) > spread * 0.6) particle.velocity[2] *= -1;
         
-        if (child instanceof THREE.Sprite) {
-          const baseFlicker = 0.7 + Math.sin(t * 2.0 * particle.flickerSpeed + particle.phase) * 0.3;
-          if (child.material instanceof THREE.SpriteMaterial) {
-            child.material.opacity = baseFlicker;
-          }
+        if (child instanceof THREE.Group) {
+          const baseFlicker = 0.72 + Math.sin(t * 2.1 * particle.flickerSpeed + particle.phase) * 0.28;
+          
+          child.children.forEach((mesh, idx) => {
+            if (mesh instanceof THREE.Mesh && mesh.material) {
+              const mat = mesh.material as THREE.MeshBasicMaterial;
+              
+              // Плавный экспоненциальный градиент без видимых слоёв
+              let baseOpacity: number;
+              if (idx === 0) {
+                baseOpacity = 0.92; // Слабо прозрачное ядро
+              } else {
+                // Очень плавное затухание
+                baseOpacity = 0.55 * Math.pow(0.58, idx);
+              }
+              
+              mat.opacity = baseOpacity * baseFlicker;
+            }
+          });
         }
       });
       
-      groupRef.current.rotation.y = t * 0.025;
+      groupRef.current.rotation.y = t * 0.03;
     }
   });
 
   return (
     <group ref={groupRef} position={position}>
       {particles.map((particle, i) => (
-        <sprite key={i} position={particle.initialPos} scale={[size * particle.scale * 15, size * particle.scale * 15, 1]}>
-          <spriteMaterial
-            color={color}
-            transparent
-            opacity={0.7}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </sprite>
+        <group key={i} position={particle.initialPos}>
+          {/* Микроскопическое яркое ядро */}
+          <mesh>
+            <sphereGeometry args={[size * particle.scale * 0.28, 8, 8]} />
+            <meshBasicMaterial 
+              color={color}
+              transparent
+              opacity={0.92}
+              toneMapped={false}
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
+            />
+          </mesh>
+          
+          {/* Множество плавных слоёв для бесшовного градиента */}
+          {[0.55, 0.85, 1.2, 1.65, 2.2, 2.9, 3.8, 5.0, 6.5, 8.5, 11.0].map((mult, idx) => (
+            <mesh key={idx}>
+              <sphereGeometry args={[size * particle.scale * mult, 12, 12]} />
+              <meshBasicMaterial 
+                color={color}
+                transparent
+                opacity={0.55 * Math.pow(0.58, idx)} // Плавное затухание
+                toneMapped={false}
+                depthWrite={false}
+                blending={THREE.AdditiveBlending}
+              />
+            </mesh>
+          ))}
+        </group>
       ))}
     </group>
   );
 }
 
-// --- ФИЗИЧЕСКИ ТОЧНЫЙ СТЕКАЮЩИЙ ВОСК ---
-// --- ПРОФЕССИОНАЛЬНЫЙ СТЕКАЮЩИЙ ВОСК ---
-function WaxDrip({ 
-  parentScale, 
-  parentPosition,
-  side = 0, 
-  delay = 0
-}: { 
-  parentScale: number,
-  parentPosition: [number, number, number],
-  side?: number, 
-  delay?: number
-}) {
-  const dripRef = useRef<THREE.Mesh>(null);
-  const trailRef = useRef<THREE.Mesh>(null);
-  const phaseTime = useMemo(() => Math.random() * 100 + delay, [delay]);
-  
-  // Расчет позиций ОТНОСИТЕЛЬНО локальной системы координат свечи
-  const candleTopY = 0.75; // Верх свечи в локальной системе
-  const candleRadius = 0.15; // Радиус свечи
-  
-  const angle = useMemo(() => side * (Math.PI / 3) + (Math.random() - 0.5) * 0.3, [side]);
-  const localX = useMemo(() => Math.cos(angle) * candleRadius * 0.92, [angle]);
-  const localZ = useMemo(() => Math.sin(angle) * candleRadius * 0.92, [angle]);
-
-  useFrame((state) => {
-    const t = state.clock.elapsedTime + phaseTime;
-    const cycleTime = t % 26;
-    
-    if (dripRef.current && trailRef.current) {
-      const worldX = parentPosition[0] + localX * parentScale;
-      const worldZ = parentPosition[2] + localZ * parentScale;
-      
-      // ФАЗА 1: Накопление (0-6s)
-      if (cycleTime < 6) {
-        const accumProgress = cycleTime / 6;
-        
-        const worldY = parentPosition[1] + candleTopY * parentScale;
-        dripRef.current.position.set(worldX, worldY, worldZ);
-        dripRef.current.scale.set(
-          0.35 + accumProgress * 0.65,
-          0.2 + accumProgress * 0.8,
-          0.35 + accumProgress * 0.65
-        );
-        
-        if (dripRef.current.material instanceof THREE.MeshStandardMaterial) {
-          dripRef.current.material.opacity = accumProgress * 0.8;
-        }
-        
-        if (trailRef.current.material instanceof THREE.MeshStandardMaterial) {
-          trailRef.current.material.opacity = 0;
-        }
-      }
-      // ФАЗА 2: Стекание (6-18s)
-      else if (cycleTime < 18) {
-        const dripProgress = (cycleTime - 6) / 12;
-        
-        const worldY = parentPosition[1] + (candleTopY - dripProgress * 2.4) * parentScale;
-        dripRef.current.position.set(worldX, worldY, worldZ);
-        
-        const stretchY = 1 + dripProgress * 6.0;
-        const shrinkXZ = Math.max(0.25, 1 - dripProgress * 0.75);
-        dripRef.current.scale.set(shrinkXZ, stretchY, shrinkXZ);
-        
-        // След
-        const trailY = parentPosition[1] + (candleTopY - 0.6) * parentScale;
-        trailRef.current.position.set(worldX, trailY, worldZ);
-        trailRef.current.scale.y = 0.2 + dripProgress * 2.0;
-        
-        if (dripRef.current.material instanceof THREE.MeshStandardMaterial) {
-          dripRef.current.material.opacity = Math.max(0, 0.8 - dripProgress * 0.9);
-        }
-        if (trailRef.current.material instanceof THREE.MeshStandardMaterial) {
-          trailRef.current.material.opacity = 0.5 * (1 - dripProgress * 0.2);
-        }
-      }
-      // ФАЗА 3: Отрыв (18-20s)
-      else if (cycleTime < 20) {
-        const fallProgress = (cycleTime - 18) / 2;
-        
-        const worldY = parentPosition[1] + (candleTopY - 2.4 - fallProgress * 2.0) * parentScale;
-        dripRef.current.position.set(worldX, worldY, worldZ);
-        dripRef.current.scale.set(0.6, 1.5, 0.6);
-        
-        if (dripRef.current.material instanceof THREE.MeshStandardMaterial) {
-          dripRef.current.material.opacity = Math.max(0, 0.3 - fallProgress * 2);
-        }
-        if (trailRef.current.material instanceof THREE.MeshStandardMaterial) {
-          trailRef.current.material.opacity = Math.max(0, 0.3 - fallProgress);
-        }
-      }
-      // ФАЗА 4: Сброс (20-26s)
-      else {
-        const worldY = parentPosition[1] + candleTopY * parentScale;
-        dripRef.current.position.set(worldX, worldY, worldZ);
-        dripRef.current.scale.set(0.35, 0.2, 0.35);
-        
-        if (dripRef.current.material instanceof THREE.MeshStandardMaterial) {
-          dripRef.current.material.opacity = 0;
-        }
-        if (trailRef.current.material instanceof THREE.MeshStandardMaterial) {
-          trailRef.current.material.opacity = 0;
-        }
-      }
-    }
-  });
-
-  return (
-    <>
-      {/* След воска */}
-      <mesh ref={trailRef}>
-        <cylinderGeometry args={[0.009 * parentScale, 0.014 * parentScale, 1.2 * parentScale, 8]} />
-        <meshStandardMaterial 
-          color="#453220" 
-          roughness={0.3} 
-          metalness={0.12}
-          transparent
-          opacity={0}
-          emissive="#2a1808"
-          emissiveIntensity={0.2}
-        />
-      </mesh>
-      
-      {/* Капля воска */}
-      <mesh ref={dripRef}>
-        <sphereGeometry args={[0.024 * parentScale, 12, 12]} />
-        <meshStandardMaterial 
-          color="#4a3020" 
-          roughness={0.2} 
-          metalness={0.15}
-          transparent
-          opacity={0}
-          emissive="#3a2210"
-          emissiveIntensity={0.3}
-        />
-      </mesh>
-    </>
-  );
-}
 
 // --- СТИЛИЗОВАННАЯ СВЕЧА С ОБЪЕМОМ И АНИМИРОВАННЫМ ВОСКОМ ---
 function CinematicCandle({ 
@@ -327,15 +222,6 @@ function CinematicCandle({
             emissiveIntensity={0.2}
           />
         </mesh>
-
-        {/* Стекающий воск - анимированные капли привязаны к свече */}
-        {waxDrips && (
-          <>
-            <WaxDrip parentScale={scale} parentPosition={position} side={1} delay={0} />
-            <WaxDrip parentScale={scale} parentPosition={position} side={-1} delay={5} />
-            <WaxDrip parentScale={scale} parentPosition={position} side={0} delay={10} />
-          </>
-        )}
 
         {/* Застывшие восковые потёки - естественное размещение */}
         <mesh position={[0.125 * scale, 0.5 * scale, 0.04 * scale]} castShadow rotation={[0.12, 0.1, -0.4]}>
@@ -620,24 +506,24 @@ export default function MagicCandleScene() {
         
         <ResponsiveCandleGroup />
         
-        {/* Золотые частицы - мягкое кинематографичное свечение */}
+        {/* Золотые частицы - 11 слоев плавного затухания */}
         <CustomSparkles 
           count={140} 
-          color="#d4af37" 
-          size={0.009} 
+          color="#FFD700" 
+          size={0.0095} 
           spread={8.5} 
           speed={0.28}
           position={[0, 0.25, 0.1]}
         />
         
-        {/* Фиолетовая мистическая пыль - тончайшие частицы */}
+        {/* Фиолетовая магическая пыльца - крохотные микрочастицы */}
         <CustomSparkles 
-          count={110} 
+          count={120} 
           color="#a855f7" 
-          size={0.003} 
-          spread={6.8} 
-          speed={0.16}
-          position={[0, -0.1, -0.9]}
+          size={0.0028} 
+          spread={7} 
+          speed={0.15}
+          position={[0, -0.05, -0.9]}
         />
         
         <CinematicRig />
@@ -645,10 +531,10 @@ export default function MagicCandleScene() {
         {/* Кинематографичная пост-обработка */}
         <EffectComposer enableNormalPass={false}>
           <Bloom 
-            luminanceThreshold={1.0} 
+            luminanceThreshold={0.85} 
             mipmapBlur 
-            intensity={1.8} 
-            radius={0.65}
+            intensity={2.2} 
+            radius={0.75}
             levels={9}
           />
           <DepthOfField 
