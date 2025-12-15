@@ -13,50 +13,6 @@ import { EffectComposer, Bloom, Noise, Vignette, ChromaticAberration, DepthOfFie
 import { BlendFunction } from "postprocessing";
 import * as THREE from "three";
 
-// --- КАСТОМНЫЙ ШЕЙДЕР ДЛЯ ПЛАВНОГО РАДИАЛЬНОГО ГРАДИЕНТА ---
-const createSmoothGradientMaterial = (color: string, intensity: number) => {
-  return new THREE.ShaderMaterial({
-    uniforms: {
-      color: { value: new THREE.Color(color) },
-      intensity: { value: intensity }
-    },
-    vertexShader: `
-      varying vec3 vNormal;
-      varying vec3 vPosition;
-      
-      void main() {
-        vNormal = normalize(normalMatrix * normal);
-        vPosition = position;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform vec3 color;
-      uniform float intensity;
-      varying vec3 vNormal;
-      varying vec3 vPosition;
-      
-      void main() {
-        // Расстояние от центра сферы (0.0 в центре, 1.0 на краю)
-        float dist = length(vPosition);
-        
-        // Плавный радиальный градиент с затуханием
-        // Используем smoothstep для идеально плавного перехода
-        float alpha = 1.0 - smoothstep(0.0, 1.0, dist);
-        
-        // Дополнительное сглаживание краев
-        alpha = pow(alpha, 1.8) * intensity;
-        
-        gl_FragColor = vec4(color, alpha);
-      }
-    `,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide
-  });
-};
-
 // --- АНИМАЦИЯ ПОЯВЛЕНИЯ ЭЛЕМЕНТА ---
 function FadeInScale({ 
   children, 
@@ -96,7 +52,7 @@ function FadeInScale({
   return <group ref={groupRef}>{children}</group>;
 }
 
-// --- ПРОФЕССИОНАЛЬНЫЕ ЧАСТИЦЫ С БЕСШОВНЫМ ГРАДИЕНТОМ ---
+// --- МИНИМАЛИСТИЧНЫЕ ЖИВЫЕ ЧАСТИЦЫ СВЕТА ---
 function CustomSparkles({ 
   count = 50, 
   color = "#FFD700",
@@ -114,21 +70,6 @@ function CustomSparkles({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   
-  // Создаём градиентные материалы для разных слоёв интенсивности
-  const gradientMaterials = useMemo(() => {
-    return [
-      createSmoothGradientMaterial(color, 0.95), // Ядро
-      createSmoothGradientMaterial(color, 0.75), // Слой 1
-      createSmoothGradientMaterial(color, 0.55), // Слой 2
-      createSmoothGradientMaterial(color, 0.38), // Слой 3
-      createSmoothGradientMaterial(color, 0.25), // Слой 4
-      createSmoothGradientMaterial(color, 0.16), // Слой 5
-      createSmoothGradientMaterial(color, 0.10), // Слой 6
-      createSmoothGradientMaterial(color, 0.06), // Слой 7
-      createSmoothGradientMaterial(color, 0.03), // Слой 8
-    ];
-  }, [color]);
-  
   const particles = useMemo(() => {
     return Array.from({ length: count }, (_, i) => ({
       initialPos: [
@@ -141,9 +82,9 @@ function CustomSparkles({
         (Math.random() - 0.5) * 0.01,
         (Math.random() - 0.5) * 0.01
       ] as [number, number, number],
-      scale: 0.7 + Math.random() * 0.6,
+      scale: 0.65 + Math.random() * 0.7,
       phase: Math.random() * Math.PI * 2,
-      flickerSpeed: 0.8 + Math.random() * 0.4
+      flickerSpeed: 0.75 + Math.random() * 0.5
     }));
   }, [count, spread]);
 
@@ -154,9 +95,10 @@ function CustomSparkles({
       groupRef.current.children.forEach((child, i) => {
         const particle = particles[i];
         
+        // Плавное органичное движение
         const offsetX = particle.initialPos[0] + Math.sin(t * particle.flickerSpeed + particle.phase) * 0.2;
-        const offsetY = particle.initialPos[1] + Math.cos(t * particle.flickerSpeed * 0.75 + particle.phase) * 0.2;
-        const offsetZ = particle.initialPos[2] + Math.sin(t * particle.flickerSpeed * 0.55 + particle.phase) * 0.14;
+        const offsetY = particle.initialPos[1] + Math.cos(t * particle.flickerSpeed * 0.7 + particle.phase) * 0.2;
+        const offsetZ = particle.initialPos[2] + Math.sin(t * particle.flickerSpeed * 0.5 + particle.phase) * 0.15;
         
         child.position.set(
           offsetX + particle.velocity[0] * t,
@@ -164,19 +106,15 @@ function CustomSparkles({
           offsetZ + particle.velocity[2] * t
         );
         
+        // Отражение от границ
         if (Math.abs(child.position.x) > spread * 0.6) particle.velocity[0] *= -1;
         if (Math.abs(child.position.y) > spread * 0.6) particle.velocity[1] *= -1;
         if (Math.abs(child.position.z) > spread * 0.6) particle.velocity[2] *= -1;
         
-        // Мерцание через обновление uniform'ов шейдера
-        if (child instanceof THREE.Group) {
-          const baseFlicker = 0.7 + Math.sin(t * 2.1 * particle.flickerSpeed + particle.phase) * 0.3;
-          
-          child.children.forEach((mesh) => {
-            if (mesh instanceof THREE.Mesh && mesh.material instanceof THREE.ShaderMaterial) {
-              mesh.material.uniforms.intensity.value = mesh.userData.baseIntensity * baseFlicker;
-            }
-          });
+        // Динамичное мерцание
+        if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
+          const flicker = 0.65 + Math.sin(t * 2.2 * particle.flickerSpeed + particle.phase) * 0.35;
+          child.material.opacity = flicker;
         }
       });
       
@@ -184,28 +122,20 @@ function CustomSparkles({
     }
   });
 
-  // Размеры слоёв с оптимальным распределением для плавного перехода
-  const layerSizes = [0.35, 0.7, 1.2, 1.9, 2.9, 4.2, 6.0, 8.5, 12.0];
-
   return (
     <group ref={groupRef} position={position}>
       {particles.map((particle, i) => (
-        <group key={i} position={particle.initialPos}>
-          {layerSizes.map((layerSize, idx) => {
-            const material = gradientMaterials[idx].clone();
-            const intensity = [0.95, 0.75, 0.55, 0.38, 0.25, 0.16, 0.10, 0.06, 0.03][idx];
-            
-            return (
-              <mesh 
-                key={idx}
-                userData={{ baseIntensity: intensity }}
-              >
-                <sphereGeometry args={[size * particle.scale * layerSize, 16, 16]} />
-                <primitive object={material} attach="material" />
-              </mesh>
-            );
-          })}
-        </group>
+        <mesh key={i} position={particle.initialPos}>
+          <sphereGeometry args={[size * particle.scale, 8, 8]} />
+          <meshBasicMaterial 
+            color={color}
+            transparent
+            opacity={0.65}
+            toneMapped={false}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+          />
+        </mesh>
       ))}
     </group>
   );
@@ -545,24 +475,24 @@ export default function MagicCandleScene() {
         
         <ResponsiveCandleGroup />
         
-        {/* Золотые частицы - 11 слоев плавного затухания */}
+        {/* Золотые частицы - живой динамичный свет */}
         <CustomSparkles 
-          count={140} 
+          count={150} 
           color="#FFD700" 
-          size={0.0095} 
-          spread={8.5} 
-          speed={0.28}
-          position={[0, 0.25, 0.1]}
+          size={0.006} 
+          spread={9} 
+          speed={0.3}
+          position={[0, 0.3, 0]}
         />
         
-        {/* Фиолетовая магическая пыльца - крохотные микрочастицы */}
+        {/* Фиолетовая магическая пыльца - микроскопические искорки */}
         <CustomSparkles 
-          count={120} 
-          color="#a855f7" 
-          size={0.0028} 
-          spread={7} 
-          speed={0.15}
-          position={[0, -0.05, -0.9]}
+          count={130} 
+          color="#b794f6" 
+          size={0.0025} 
+          spread={7.5} 
+          speed={0.18}
+          position={[0, 0, -0.8]}
         />
         
         <CinematicRig />
@@ -570,10 +500,10 @@ export default function MagicCandleScene() {
         {/* Кинематографичная пост-обработка */}
         <EffectComposer enableNormalPass={false}>
           <Bloom 
-            luminanceThreshold={0.8} 
+            luminanceThreshold={0.2} 
             mipmapBlur 
-            intensity={2.5} 
-            radius={0.85}
+            intensity={3.5} 
+            radius={1.2}
             levels={9}
           />
           <DepthOfField 
