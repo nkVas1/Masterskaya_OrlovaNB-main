@@ -81,7 +81,7 @@ export default function Home() {
       <section className="relative h-screen w-full flex flex-col justify-center items-center text-center overflow-hidden">
         <MagicCandleScene />
 
-        <div className="z-10 mt-[40vh] p-4 relative pointer-events-none space-y-8">
+        <div className="z-10 mt-[45vh] p-4 relative pointer-events-none space-y-8">
           <div className="space-y-4">
             <h2 className="text-gold tracking-[0.2em] text-sm md:text-base mb-4 uppercase opacity-80 font-sans">
               Псковская область • Ручная работа • Магия
@@ -296,9 +296,21 @@ export default function Home() {
       </Section>
 
       {/* FOOTER */}
-      <footer className="w-full py-8 px-6 text-center text-xs text-gray-700 border-t border-white/5">
-        <p className="mb-2">© 2025 Мастерская Орлова Н.Б. Все права защищены.</p>
-        <p className="text-gray-800">Сайт является произведением искусства.</p>
+      <footer className="w-full py-12 text-center text-xs text-gray-700 border-t border-white/5 bg-black z-20 relative">
+        <div className="flex flex-col gap-4 items-center justify-center">
+          <p>© 2025 Мастерская Орлова Н.Б. Все права защищены.</p>
+          <p className="text-gray-600 flex items-center gap-1">
+            Разработка сайта — 
+            <a 
+              href="https://odinlab-studios.vercel.app/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-copper hover:text-gold transition-colors font-serif italic tracking-wide border-b border-transparent hover:border-gold"
+            >
+              OdinLab Studios
+            </a>
+          </p>
+        </div>
       </footer>
     </main>
   );

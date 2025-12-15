@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Inter } from "next/font/google";
 import "./globals.css";
+import CustomCursor from "@/components/CustomCursor";
 
 const cormorant = Cormorant_Garamond({
   subsets: ["cyrillic", "latin"],
@@ -61,7 +62,8 @@ export default function RootLayout({
         <meta name="theme-color" content="#050505" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </head>
-      <body className={`${cormorant.variable} ${inter.variable} bg-void antialiased`}>
+      <body className={`${cormorant.variable} ${inter.variable} bg-void antialiased cursor-none`}>
+        <CustomCursor />
         <div className="grain-overlay" />
         {children}
       </body>
