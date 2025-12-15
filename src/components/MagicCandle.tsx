@@ -69,37 +69,13 @@ function PortalMirror() {
   );
 }
 
-// --- ГЛАВНАЯ ГРУППА С АДАПТАЦИЕЙ ---
-function MainScene() {
-  const { width } = useThree((state) => state.viewport);
-  
-  const isMobile = width < 5;
-  const scale = isMobile ? 0.55 : 1;
-  const positionY = isMobile ? 0.5 : -0.5;
-
-  return (
-    <group position={[0, positionY, 0]} scale={scale}>
-      <Float speed={1.5} rotationIntensity={0.1} floatIntensity={0.2}>
-        <PortalMirror />
-      </Float>
-      
-      <Candle position={[-1.8, -0.5, 1.5]} scale={1.2} flickerSpeed={0.8} />
-      <Candle position={[1.8, -0.8, 1.2]} scale={1.1} flickerSpeed={1.1} />
-      <Candle position={[-0.8, -1.2, 2.5]} scale={0.6} flickerSpeed={1.5} />
-      <Candle position={[0.9, -1.1, 2.8]} scale={0.5} flickerSpeed={1.3} />
-      <Candle position={[0, -1.6, 2.0]} scale={0.8} flickerSpeed={1.0} />
-
-      <Sparkles count={80} scale={8} size={4} speed={0.4} opacity={0.6} color="#FFD700" position={[0, 0, 1]}/>
-      <Sparkles count={40} scale={5} size={2} speed={0.2} opacity={0.3} color="#4b0082" position={[0, 0, -1]}/>
-    </group>
-  );
-}
-
-// --- УПРАВЛЕНИЕ КАМЕРОЙ ---
+// --- УПРАВЛЕНИЕ КАМЕРОЙ С АДАПТАЦИЕЙ ДЛЯ МОБИЛЬНЫХ ---
 function Rig() {
-  const { camera, mouse } = useThree();
+  const { camera, mouse, viewport } = useThree();
   const vec = new THREE.Vector3();
   const [deviceOrientation, setDeviceOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
+
+  const isMobile = viewport.width < 5;
 
   useEffect(() => {
     const handleOrientation = (event: DeviceOrientationEvent) => {
@@ -127,20 +103,22 @@ function Rig() {
     let x = 0;
     let y = 0;
 
+    const cameraZ = isMobile ? 6.5 : 4.5;
+
     if (deviceOrientation.beta !== 0 || deviceOrientation.gamma !== 0) {
       x = THREE.MathUtils.clamp(deviceOrientation.gamma, -20, 20) * 0.05;
       y = THREE.MathUtils.clamp(deviceOrientation.beta - 45, -20, 20) * 0.05;
     } else {
-      x = mouse.x * 1.5;
-      y = mouse.y * 0.5;
+      x = mouse.x * 0.8;
+      y = mouse.y * 0.4;
       
       if (Math.abs(mouse.x) < 0.01 && Math.abs(mouse.y) < 0.01) {
-        x = Math.sin(t * 0.5) * 0.5;
-        y = Math.cos(t * 0.3) * 0.3;
+        x = Math.sin(t * 0.2) * 0.2;
+        y = Math.cos(t * 0.2) * 0.1;
       }
     }
 
-    camera.position.lerp(vec.set(x, y, 4.5), 0.025);
+    camera.position.lerp(vec.set(x, y, cameraZ), 0.05);
     camera.lookAt(0, 0, 0);
   });
 
@@ -150,17 +128,33 @@ function Rig() {
 // --- СЦЕНА ---
 export default function MagicCandleScene() {
   return (
-    <div className="h-[90vh] w-full absolute top-0 left-0 -z-10">
-      <Canvas shadows dpr={[1, 2]} gl={{ antialias: false }}>
+    <div className="h-[80vh] w-full absolute top-0 left-0 -z-10">
+      <Canvas shadows dpr={[1, 2]} gl={{ antialias: false, toneMapping: THREE.ReinhardToneMapping }}>
         <PerspectiveCamera makeDefault position={[0, 0, 4.5]} fov={50} />
         <Environment preset="city" environmentIntensity={0.2} />
         
-        <MainScene />
+        <group position={[0, -0.5, 0]}>
+          <Float speed={1.5} rotationIntensity={0.1} floatIntensity={0.2}>
+            <PortalMirror />
+          </Float>
+          
+          <Candle position={[-1.8, -0.5, 1.5]} scale={1.2} flickerSpeed={0.8} />
+          <Candle position={[1.8, -0.8, 1.2]} scale={1.1} flickerSpeed={1.1} />
+          <Candle position={[-0.8, -1.2, 2.5]} scale={0.6} flickerSpeed={1.5} />
+          <Candle position={[0.9, -1.1, 2.8]} scale={0.5} flickerSpeed={1.3} />
+          <Candle position={[-2.2, -1.0, 0.5]} scale={0.7} flickerSpeed={0.9} />
+          <Candle position={[2.1, -0.6, 0]} scale={0.8} flickerSpeed={1.2} />
+          <Candle position={[0, -1.5, 3]} scale={0.4} flickerSpeed={2} />
+
+          <Sparkles count={80} scale={8} size={4} speed={0.4} opacity={0.6} color="#FFD700" position={[0, 0, 1]}/>
+          <Sparkles count={40} scale={5} size={2} speed={0.2} opacity={0.3} color="#4b0082" position={[0, 0, -1]}/>
+        </group>
+        
         <Rig />
 
         <EffectComposer disableNormalPass>
-          <Bloom luminanceThreshold={1} mipmapBlur intensity={1.2} radius={0.4} />
-          <Noise opacity={0.06} /> 
+          <Bloom luminanceThreshold={1} mipmapBlur intensity={1.5} radius={0.4} />
+          <Noise opacity={0.05} /> 
           <Vignette eskil={false} offset={0.1} darkness={1.1} />
         </EffectComposer>
       </Canvas>
