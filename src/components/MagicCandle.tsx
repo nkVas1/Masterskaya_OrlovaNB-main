@@ -13,7 +13,67 @@ import { EffectComposer, Bloom, Noise, Vignette, ChromaticAberration, DepthOfFie
 import { BlendFunction } from "postprocessing";
 import * as THREE from "three";
 
-// --- УЛУЧШЕННАЯ СВЕЧА С ДЕТАЛЯМИ ---
+// --- КОМПОНЕНТ АНИМИРОВАННЫХ КАПЕЛЬ ВОСКА ---
+function WaxDrip({ 
+  parentScale, 
+  side = 0, 
+  delay = 0 
+}: { 
+  parentScale: number, 
+  side?: number, 
+  delay?: number 
+}) {
+  const dripRef = useRef<THREE.Mesh>(null);
+  const [isActive, setIsActive] = useState(false);
+  const phase = useMemo(() => Math.random() * 100 + delay, [delay]);
+
+  useFrame((state) => {
+    const t = state.clock.elapsedTime + phase;
+    
+    if (dripRef.current) {
+      // Периодическое появление и стекание капель
+      const cycle = (Math.sin(t * 0.3) + 1) / 2; // 0 to 1
+      
+      if (cycle > 0.95) {
+        setIsActive(true);
+      } else if (cycle < 0.05) {
+        setIsActive(false);
+      }
+      
+      if (isActive) {
+        // Капля медленно стекает вниз
+        const flowProgress = Math.min(1, (t % 10) * 0.15);
+        dripRef.current.position.y = 0.3 * parentScale - flowProgress * 1.2 * parentScale;
+        dripRef.current.scale.setScalar(1 - flowProgress * 0.5);
+        (dripRef.current.material as THREE.MeshStandardMaterial).opacity = 1 - flowProgress * 0.7;
+      } else {
+        dripRef.current.position.y = 0.3 * parentScale;
+        dripRef.current.scale.setScalar(1);
+        (dripRef.current.material as THREE.MeshStandardMaterial).opacity = 0;
+      }
+    }
+  });
+
+  const xOffset = side * 0.15 * parentScale;
+  const zOffset = (Math.random() - 0.5) * 0.1 * parentScale;
+
+  return (
+    <mesh ref={dripRef} position={[xOffset, 0.3 * parentScale, zOffset]}>
+      <sphereGeometry args={[0.04 * parentScale, 8, 12]} />
+      <meshStandardMaterial 
+        color="#4a3020" 
+        roughness={0.4} 
+        metalness={0.1}
+        transparent
+        opacity={0}
+        emissive="#2a1505"
+        emissiveIntensity={0.2}
+      />
+    </mesh>
+  );
+}
+
+// --- СТИЛИЗОВАННАЯ СВЕЧА С ОБЪЕМОМ И АНИМИРОВАННЫМ ВОСКОМ ---
 function CinematicCandle({ 
   position, 
   scale = 1, 
@@ -27,189 +87,168 @@ function CinematicCandle({
 }) {
   const lightRef = useRef<THREE.PointLight>(null);
   const flameRef = useRef<THREE.Mesh>(null);
-  const glowRef = useRef<THREE.Mesh>(null);
   const phase = useMemo(() => Math.random() * 100, []);
 
   useFrame((state) => {
     const t = state.clock.elapsedTime + phase;
     
-    // Реалистичное мерцание света
     if (lightRef.current) {
-      const flicker = Math.sin(t * 10 * flickerSpeed) * 0.3 + 
-                      Math.cos(t * 23) * 0.15 + 
-                      Math.sin(t * 7) * 0.1;
-      lightRef.current.intensity = 2.5 + flicker;
-      lightRef.current.position.x = position[0] + Math.sin(t * 2) * 0.03;
-      lightRef.current.position.y = 0.8 * scale + Math.cos(t * 3) * 0.02;
+      lightRef.current.intensity = 1.5 + Math.sin(t * 10 * flickerSpeed) * 0.3 + Math.cos(t * 23) * 0.1;
+      lightRef.current.position.x = position[0] + Math.sin(t * 2) * 0.02;
     }
     
-    // Органичная анимация пламени
+    // Стилизованное пламя как раньше
     if (flameRef.current) {
       flameRef.current.scale.set(
-        0.8 * scale + Math.sin(t * 15) * 0.15 * scale, 
-        1.4 * scale + Math.sin(t * 10) * 0.25 * scale, 
-        0.8 * scale + Math.cos(t * 12) * 0.1 * scale
+        1 * scale + Math.sin(t * 15) * 0.1 * scale, 
+        1.2 * scale + Math.sin(t * 10) * 0.2 * scale, 
+        1 * scale + Math.cos(t * 12) * 0.1 * scale
       );
-      flameRef.current.rotation.z = Math.sin(t * 5) * 0.1;
-      flameRef.current.position.y = 0.55 * scale + Math.sin(t * 8) * 0.02;
-    }
-    
-    // Мягкое свечение вокруг пламени
-    if (glowRef.current) {
-      glowRef.current.scale.set(
-        1.2 + Math.sin(t * 8) * 0.2,
-        1.2 + Math.cos(t * 10) * 0.2,
-        1.2 + Math.sin(t * 6) * 0.2
-      );
-      (glowRef.current.material as THREE.MeshBasicMaterial).opacity = 0.3 + Math.sin(t * 5) * 0.1;
+      flameRef.current.rotation.z = Math.sin(t * 5) * 0.05;
     }
   });
 
   return (
     <group position={position}>
-      {/* Основа свечи - более детализированная */}
-      <mesh position={[0, -0.4 * scale, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.18 * scale, 0.2 * scale, 1.8 * scale, 32]} />
+      {/* Тело свечи - более объемное и детальное */}
+      <mesh position={[0, -0.5 * scale, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.15 * scale, 0.18 * scale, 1.5 * scale, 32]} />
         <meshStandardMaterial 
-          color="#2a1505" 
-          roughness={0.75} 
-          metalness={0.1}
-          emissive="#1a0800" 
-          emissiveIntensity={0.15}
+          color="#1a0b00" 
+          roughness={0.8} 
+          metalness={0.05}
+          emissive="#220a00" 
+          emissiveIntensity={0.2}
         />
       </mesh>
 
-      {/* Капли воска */}
+      {/* Стекающий воск - анимированные капли */}
       {waxDrips && (
         <>
-          <mesh position={[0.12 * scale, -0.2 * scale, 0.05 * scale]} castShadow>
-            <sphereGeometry args={[0.05 * scale, 8, 8]} />
-            <meshStandardMaterial color="#3d2010" roughness={0.6} metalness={0.2} />
-          </mesh>
-          <mesh position={[-0.1 * scale, 0.1 * scale, -0.08 * scale]} castShadow>
-            <sphereGeometry args={[0.04 * scale, 8, 8]} />
-            <meshStandardMaterial color="#3d2010" roughness={0.6} metalness={0.2} />
-          </mesh>
+          <WaxDrip parentScale={scale} side={1} delay={0} />
+          <WaxDrip parentScale={scale} side={-1} delay={3} />
+          <WaxDrip parentScale={scale} side={0.5} delay={6} />
         </>
       )}
 
       {/* Фитиль */}
-      <mesh position={[0, 0.35 * scale, 0]}>
-        <cylinderGeometry args={[0.015 * scale, 0.015 * scale, 0.15 * scale]} />
-        <meshStandardMaterial color="#0a0a0a" roughness={0.9} />
+      <mesh position={[0, 0.25 * scale, 0]}>
+        <cylinderGeometry args={[0.01 * scale, 0.01 * scale, 0.1 * scale]} />
+        <meshBasicMaterial color="#000" />
       </mesh>
 
-      {/* Внутреннее ядро пламени (яркое) */}
-      <mesh ref={flameRef} position={[0, 0.5 * scale, 0]}>
-        <coneGeometry args={[0.12 * scale, 0.4 * scale, 8]} />
-        <meshBasicMaterial color={[8, 4, 1]} toneMapped={false} />
+      {/* СТИЛИЗОВАННОЕ пламя - сферическое как раньше */}
+      <mesh ref={flameRef} position={[0, 0.45 * scale, 0]}>
+        <sphereGeometry args={[0.06 * scale, 16, 16]} />
+        <meshBasicMaterial color={[5, 2, 0.5]} toneMapped={false} />
       </mesh>
 
-      {/* Внешнее свечение пламени */}
-      <mesh ref={glowRef} position={[0, 0.5 * scale, 0]}>
-        <sphereGeometry args={[0.15 * scale, 16, 16]} />
-        <meshBasicMaterial 
-          color={[3, 1.5, 0.3]} 
-          transparent 
-          opacity={0.35}
-          toneMapped={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
-
-      {/* Точечный источник света с тенями */}
+      {/* Точечный источник света */}
       <pointLight 
         ref={lightRef} 
-        position={[0, 0.8 * scale, 0]} 
-        color="#ff8c00" 
-        intensity={2.5}
-        distance={4} 
+        position={[0, 0.6 * scale, 0]} 
+        color="#ff7b00" 
+        intensity={1.5}
+        distance={3} 
         decay={2} 
         castShadow
-        shadow-mapSize-width={512}
-        shadow-mapSize-height={512}
-        shadow-bias={-0.0001}
-      />
-
-      {/* Мягкий заполняющий свет снизу */}
-      <pointLight 
-        position={[0, -0.5 * scale, 0]} 
-        color="#ff6600" 
-        intensity={0.3}
-        distance={1.5}
       />
     </group>
   );
 }
 
-// --- УЛУЧШЕННОЕ ЗЕРКАЛО-ПОРТАЛ ---
+// --- ДРЕВЕСНОЕ ЗЕРКАЛО-ПОРТАЛ С МАГИЕЙ ---
 function CinematicPortalMirror() {
   const mirrorRef = useRef<THREE.Mesh>(null);
+  const portalRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    
+    // Динамичное искажение зеркала
     if (mirrorRef.current && mirrorRef.current.material) {
       const material = mirrorRef.current.material as any;
       if (material.distort !== undefined) {
-        material.distort = 0.35 + Math.sin(state.clock.elapsedTime * 0.5) * 0.05;
+        material.distort = 0.45 + Math.sin(t * 0.6) * 0.15;
       }
+    }
+    
+    // Портальная энергия
+    if (portalRef.current) {
+      portalRef.current.rotation.z = t * 0.1;
+      (portalRef.current.material as THREE.MeshBasicMaterial).opacity = 0.15 + Math.sin(t * 2) * 0.05;
     }
   });
 
   return (
-    <group position={[0, 0.5, -1.2]}>
-      {/* Внешняя рама - более массивная */}
-      <mesh position={[0, 0, -0.08]} castShadow receiveShadow>
-        <ringGeometry args={[1.35, 1.85, 64]} />
+    <group position={[0, 0.5, -1]}>
+      {/* Внешняя рама - древесная текстура */}
+      <mesh position={[0, 0, -0.05]} castShadow receiveShadow>
+        <ringGeometry args={[1.4, 1.8, 64]} />
         <meshStandardMaterial 
-          color="#0d0d0d" 
+          color="#0a0a0a" 
+          roughness={0.9} 
+          metalness={0.5} 
+          envMapIntensity={0.5}
+        />
+      </mesh>
+
+      {/* Внутренняя древесная рама с рельефом */}
+      <mesh position={[0, 0, -0.03]} castShadow>
+        <ringGeometry args={[1.35, 1.45, 6]} />
+        <meshStandardMaterial 
+          color="#3d2a1f" 
+          roughness={0.95} 
+          metalness={0.0}
+          normalScale={new THREE.Vector2(0.5, 0.5)}
+        />
+      </mesh>
+
+      {/* Резные узоры на раме */}
+      <mesh position={[0, 0, -0.02]}>
+        <ringGeometry args={[1.38, 1.42, 32]} />
+        <meshStandardMaterial 
+          color="#5a3a2a" 
           roughness={0.85} 
-          metalness={0.6} 
-          envMapIntensity={0.7}
+          emissive="#2a1510"
+          emissiveIntensity={0.3}
         />
       </mesh>
 
-      {/* Внутренняя рама с гравировкой */}
-      <mesh position={[0, 0, -0.04]} castShadow>
-        <ringGeometry args={[1.3, 1.4, 64]} />
-        <meshStandardMaterial 
-          color="#1a1410" 
-          roughness={0.7} 
-          metalness={0.3}
-          emissive="#442200"
-          emissiveIntensity={0.1}
+      {/* Портальное свечение за зеркалом */}
+      <mesh ref={portalRef} position={[0, 0, -0.1]}>
+        <ringGeometry args={[1.1, 1.35, 64]} />
+        <meshBasicMaterial 
+          color="#6a2d9e" 
+          transparent
+          opacity={0.15}
+          blending={THREE.AdditiveBlending}
+          side={THREE.DoubleSide}
         />
       </mesh>
 
-      {/* Зеркальная поверхность с искажением */}
+      {/* Зеркальная поверхность с сильным искажением */}
       <mesh ref={mirrorRef}>
-        <circleGeometry args={[1.3, 64]} />
+        <circleGeometry args={[1.4, 64]} />
         <MeshDistortMaterial 
-          color="#050505" 
-          envMapIntensity={1.2} 
+          color="#000000" 
+          envMapIntensity={1.5} 
           clearcoat={1} 
-          clearcoatRoughness={0.1}
-          metalness={0.95} 
-          roughness={0.05} 
-          distort={0.35} 
-          speed={0.4}
+          clearcoatRoughness={0}
+          metalness={1} 
+          roughness={0} 
+          distort={0.45} 
+          speed={0.6}
         />
       </mesh>
 
-      {/* Магическая подсветка портала */}
+      {/* Глубокая подсветка портала */}
       <pointLight 
-        position={[0, 0, -1.5]} 
-        intensity={6} 
-        color="#5a1d7e" 
-        distance={6}
+        position={[0, 0, -1]} 
+        intensity={5} 
+        color="#4b0082" 
+        distance={5}
         decay={2}
-      />
-      
-      {/* Rim light для объема */}
-      <pointLight 
-        position={[0, 2, -0.5]} 
-        intensity={2} 
-        color="#7a3a9e" 
-        distance={4}
       />
     </group>
   );
@@ -352,24 +391,26 @@ export default function MagicCandleScene() {
         
         <ResponsiveCandleGroup />
         
-        {/* Магические частицы */}
+        {/* Золотые частицы */}
         <Sparkles 
-          count={100} 
-          scale={10} 
-          size={3} 
-          speed={0.3} 
-          opacity={0.5} 
+          count={80} 
+          scale={8} 
+          size={4} 
+          speed={0.4} 
+          opacity={0.6} 
           color="#FFD700" 
-          position={[0, 0.5, 0]}
+          position={[0, 0, 1]}
         />
+        
+        {/* Магическая пыль (фиолетовая) - очень мелкая */}
         <Sparkles 
-          count={60} 
-          scale={6} 
-          size={2} 
-          speed={0.15} 
-          opacity={0.35} 
-          color="#8b5cf6" 
-          position={[0, 0, -0.5]}
+          count={50} 
+          scale={5} 
+          size={0.8} 
+          speed={0.2} 
+          opacity={0.25} 
+          color="#4b0082" 
+          position={[0, 0, -1]}
         />
         
         <CinematicRig />
@@ -377,16 +418,16 @@ export default function MagicCandleScene() {
         {/* Кинематографичная пост-обработка */}
         <EffectComposer disableNormalPass>
           <Bloom 
-            luminanceThreshold={0.9} 
+            luminanceThreshold={1.0} 
             mipmapBlur 
-            intensity={1.8} 
-            radius={0.6}
+            intensity={1.5} 
+            radius={0.5}
             levels={8}
           />
           <DepthOfField 
-            focusDistance={0.02} 
-            focalLength={0.05} 
-            bokehScale={3}
+            focusDistance={0.015} 
+            focalLength={0.04} 
+            bokehScale={2}
             height={480}
           />
           <ChromaticAberration 
