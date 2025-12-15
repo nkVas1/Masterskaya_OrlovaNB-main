@@ -1,7 +1,13 @@
-import MagicCandleScene from "@/components/MagicCandle";
+import dynamic from "next/dynamic";
 import Section from "@/components/Section";
 import Button from "@/components/Button";
 import { ArrowDown, Sparkles, MapPin, Mail, Phone } from "lucide-react";
+
+// Динамический импорт Canvas компонента без SSR (только клиент)
+const MagicCandleScene = dynamic(() => import("@/components/MagicCandle"), {
+  ssr: false,
+  loading: () => <div className="h-[80vh] w-full bg-gradient-to-b from-void to-mystic" />,
+});
 
 // Данные каталога
 const products = [
