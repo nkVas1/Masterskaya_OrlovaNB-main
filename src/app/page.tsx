@@ -75,7 +75,7 @@ export default function Home() {
       <section className="relative h-screen w-full flex flex-col justify-center items-center text-center overflow-hidden">
         <MagicCandleScene />
 
-        <div className="z-10 mt-32 md:mt-0 p-4 space-y-8">
+        <div className="z-10 mt-[40vh] p-4 relative pointer-events-none space-y-8">
           <div className="space-y-4">
             <h2 className="text-gold tracking-[0.2em] text-sm md:text-base mb-4 uppercase opacity-80 font-sans">
               Псковская область • Ручная работа • Магия
