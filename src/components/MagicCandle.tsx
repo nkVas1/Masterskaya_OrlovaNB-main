@@ -13,6 +13,50 @@ import { EffectComposer, Bloom, Noise, Vignette, ChromaticAberration, DepthOfFie
 import { BlendFunction } from "postprocessing";
 import * as THREE from "three";
 
+// --- КАСТОМНЫЙ ШЕЙДЕР ДЛЯ ПЛАВНОГО РАДИАЛЬНОГО ГРАДИЕНТА ---
+const createSmoothGradientMaterial = (color: string, intensity: number) => {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      color: { value: new THREE.Color(color) },
+      intensity: { value: intensity }
+    },
+    vertexShader: `
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        vPosition = position;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 color;
+      uniform float intensity;
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      
+      void main() {
+        // Расстояние от центра сферы (0.0 в центре, 1.0 на краю)
+        float dist = length(vPosition);
+        
+        // Плавный радиальный градиент с затуханием
+        // Используем smoothstep для идеально плавного перехода
+        float alpha = 1.0 - smoothstep(0.0, 1.0, dist);
+        
+        // Дополнительное сглаживание краев
+        alpha = pow(alpha, 1.8) * intensity;
+        
+        gl_FragColor = vec4(color, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide
+  });
+};
+
 // --- АНИМАЦИЯ ПОЯВЛЕНИЯ ЭЛЕМЕНТА ---
 function FadeInScale({ 
   children, 
@@ -52,7 +96,7 @@ function FadeInScale({
   return <group ref={groupRef}>{children}</group>;
 }
 
-// --- КИНЕМАТОГРАФИЧНЫЕ ЧАСТИЦЫ С 11 СЛОЯМИ ПЛАВНОГО ЗАТУХАНИЯ ---
+// --- ПРОФЕССИОНАЛЬНЫЕ ЧАСТИЦЫ С БЕСШОВНЫМ ГРАДИЕНТОМ ---
 function CustomSparkles({ 
   count = 50, 
   color = "#FFD700",
@@ -70,6 +114,21 @@ function CustomSparkles({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   
+  // Создаём градиентные материалы для разных слоёв интенсивности
+  const gradientMaterials = useMemo(() => {
+    return [
+      createSmoothGradientMaterial(color, 0.95), // Ядро
+      createSmoothGradientMaterial(color, 0.75), // Слой 1
+      createSmoothGradientMaterial(color, 0.55), // Слой 2
+      createSmoothGradientMaterial(color, 0.38), // Слой 3
+      createSmoothGradientMaterial(color, 0.25), // Слой 4
+      createSmoothGradientMaterial(color, 0.16), // Слой 5
+      createSmoothGradientMaterial(color, 0.10), // Слой 6
+      createSmoothGradientMaterial(color, 0.06), // Слой 7
+      createSmoothGradientMaterial(color, 0.03), // Слой 8
+    ];
+  }, [color]);
+  
   const particles = useMemo(() => {
     return Array.from({ length: count }, (_, i) => ({
       initialPos: [
@@ -82,7 +141,7 @@ function CustomSparkles({
         (Math.random() - 0.5) * 0.01,
         (Math.random() - 0.5) * 0.01
       ] as [number, number, number],
-      scale: 0.65 + Math.random() * 0.7,
+      scale: 0.7 + Math.random() * 0.6,
       phase: Math.random() * Math.PI * 2,
       flickerSpeed: 0.8 + Math.random() * 0.4
     }));
@@ -109,23 +168,13 @@ function CustomSparkles({
         if (Math.abs(child.position.y) > spread * 0.6) particle.velocity[1] *= -1;
         if (Math.abs(child.position.z) > spread * 0.6) particle.velocity[2] *= -1;
         
+        // Мерцание через обновление uniform'ов шейдера
         if (child instanceof THREE.Group) {
-          const baseFlicker = 0.72 + Math.sin(t * 2.1 * particle.flickerSpeed + particle.phase) * 0.28;
+          const baseFlicker = 0.7 + Math.sin(t * 2.1 * particle.flickerSpeed + particle.phase) * 0.3;
           
-          child.children.forEach((mesh, idx) => {
-            if (mesh instanceof THREE.Mesh && mesh.material) {
-              const mat = mesh.material as THREE.MeshBasicMaterial;
-              
-              // Плавный экспоненциальный градиент без видимых слоёв
-              let baseOpacity: number;
-              if (idx === 0) {
-                baseOpacity = 0.92; // Слабо прозрачное ядро
-              } else {
-                // Очень плавное затухание
-                baseOpacity = 0.55 * Math.pow(0.58, idx);
-              }
-              
-              mat.opacity = baseOpacity * baseFlicker;
+          child.children.forEach((mesh) => {
+            if (mesh instanceof THREE.Mesh && mesh.material instanceof THREE.ShaderMaterial) {
+              mesh.material.uniforms.intensity.value = mesh.userData.baseIntensity * baseFlicker;
             }
           });
         }
@@ -135,37 +184,27 @@ function CustomSparkles({
     }
   });
 
+  // Размеры слоёв с оптимальным распределением для плавного перехода
+  const layerSizes = [0.35, 0.7, 1.2, 1.9, 2.9, 4.2, 6.0, 8.5, 12.0];
+
   return (
     <group ref={groupRef} position={position}>
       {particles.map((particle, i) => (
         <group key={i} position={particle.initialPos}>
-          {/* Микроскопическое яркое ядро */}
-          <mesh>
-            <sphereGeometry args={[size * particle.scale * 0.28, 8, 8]} />
-            <meshBasicMaterial 
-              color={color}
-              transparent
-              opacity={0.92}
-              toneMapped={false}
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-            />
-          </mesh>
-          
-          {/* Множество плавных слоёв для бесшовного градиента */}
-          {[0.55, 0.85, 1.2, 1.65, 2.2, 2.9, 3.8, 5.0, 6.5, 8.5, 11.0].map((mult, idx) => (
-            <mesh key={idx}>
-              <sphereGeometry args={[size * particle.scale * mult, 12, 12]} />
-              <meshBasicMaterial 
-                color={color}
-                transparent
-                opacity={0.55 * Math.pow(0.58, idx)} // Плавное затухание
-                toneMapped={false}
-                depthWrite={false}
-                blending={THREE.AdditiveBlending}
-              />
-            </mesh>
-          ))}
+          {layerSizes.map((layerSize, idx) => {
+            const material = gradientMaterials[idx].clone();
+            const intensity = [0.95, 0.75, 0.55, 0.38, 0.25, 0.16, 0.10, 0.06, 0.03][idx];
+            
+            return (
+              <mesh 
+                key={idx}
+                userData={{ baseIntensity: intensity }}
+              >
+                <sphereGeometry args={[size * particle.scale * layerSize, 16, 16]} />
+                <primitive object={material} attach="material" />
+              </mesh>
+            );
+          })}
         </group>
       ))}
     </group>
@@ -531,10 +570,10 @@ export default function MagicCandleScene() {
         {/* Кинематографичная пост-обработка */}
         <EffectComposer enableNormalPass={false}>
           <Bloom 
-            luminanceThreshold={0.85} 
+            luminanceThreshold={0.8} 
             mipmapBlur 
-            intensity={2.2} 
-            radius={0.75}
+            intensity={2.5} 
+            radius={0.85}
             levels={9}
           />
           <DepthOfField 
