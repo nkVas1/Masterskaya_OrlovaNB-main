@@ -124,23 +124,32 @@ function Rig() {
   useEffect(() => {
     // Простейшая проверка на мобильное устройство (с проверкой window для SSR)
     if (typeof window !== 'undefined') {
-      setIsMobile(/Android|iPhone/i.test(navigator.userAgent));
+      try {
+        setIsMobile(/Android|iPhone/i.test(navigator.userAgent));
+      } catch (error) {
+        console.warn('Ошибка определения мобильного устройства:', error);
+        setIsMobile(false);
+      }
     }
   }, []);
 
   useFrame((state) => {
-    if (isMobile) {
-       // На мобильных - автоматический дрейф для эффекта
-       const t = state.clock.elapsedTime;
-       camera.position.lerp(new THREE.Vector3(Math.sin(t * 0.5) * 0.5, Math.cos(t * 0.3) * 0.2, 4.5), 0.05);
-       camera.lookAt(0, 0, 0);
-    } else {
-       // Параллакс мышью для десктопа
-       const x = state.mouse.x * 0.8; 
-       const y = state.mouse.y * 0.4;
-       
-       camera.position.lerp(new THREE.Vector3(x, y, 4.5), 0.05);
-       camera.lookAt(0, 0, 0);
+    try {
+      if (isMobile) {
+         // На мобильных - автоматический дрейф для эффекта
+         const t = state.clock.elapsedTime;
+         camera.position.lerp(new THREE.Vector3(Math.sin(t * 0.5) * 0.5, Math.cos(t * 0.3) * 0.2, 4.5), 0.05);
+         camera.lookAt(0, 0, 0);
+      } else {
+         // Параллакс мышью для десктопа
+         const x = state.mouse.x * 0.8; 
+         const y = state.mouse.y * 0.4;
+         
+         camera.position.lerp(new THREE.Vector3(x, y, 4.5), 0.05);
+         camera.lookAt(0, 0, 0);
+      }
+    } catch (error) {
+      console.warn('Ошибка в Rig useFrame:', error);
     }
   });
 
@@ -151,7 +160,21 @@ function Rig() {
 export default function MagicCandleScene() {
   return (
     <div className="h-[80vh] w-full absolute top-0 left-0 -z-10 pointer-events-none">
-      <Canvas shadows dpr={[1, 2]} gl={{ antialias: false, toneMapping: THREE.ReinhardToneMapping, toneMappingExposure: 1.5 }}>
+      <Canvas 
+        shadows 
+        dpr={[1, 2]} 
+        gl={{ 
+          antialias: false, 
+          toneMapping: THREE.ReinhardToneMapping, 
+          toneMappingExposure: 1.5,
+          alpha: true, // Добавляем прозрачность
+          powerPreference: 'high-performance' // Оптимизация для мобильных
+        }}
+        onCreated={(state) => {
+          // Логирование для отладки
+          console.log('Canvas инициализирован успешно');
+        }}
+      >
         <PerspectiveCamera makeDefault position={[0, 0, 4.5]} fov={50} />
         
         {/* Окружение для отражений в зеркале */}
