@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /.vercel/
+
+Sitemap: https://orlov-workshop.vercel.app/sitemap.xml
