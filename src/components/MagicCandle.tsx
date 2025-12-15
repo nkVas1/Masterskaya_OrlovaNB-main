@@ -204,7 +204,7 @@ function CustomSparkles({
   );
 }
 
-// --- РЕАЛИСТИЧНЫЙ СТЕКАЮЩИЙ ВОСК ---
+// --- ФИЗИЧЕСКИ ТОЧНЫЙ СТЕКАЮЩИЙ ВОСК ---
 function WaxDrip({ 
   parentScale, 
   side = 0, 
@@ -215,100 +215,158 @@ function WaxDrip({
   delay?: number 
 }) {
   const dripGroupRef = useRef<THREE.Group>(null);
-  const [isActive, setIsActive] = useState(false);
-  const phase = useMemo(() => Math.random() * 100 + delay, [delay]);
-  // ИЗМЕНЕНО: капля начинается ниже, на уровне верха тела свечи
-  const startY = useMemo(() => 0.15 + Math.random() * 0.1, []);
+  const trailRef = useRef<THREE.Mesh>(null);
+  const [phase, setPhase] = useState<'accumulating' | 'dripping' | 'detaching' | 'reset'>('reset');
+  const [progress, setProgress] = useState(0);
+  const phaseTime = useMemo(() => Math.random() * 100 + delay, [delay]);
+  const startY = 0.23; // Верхний край свечи
+  const xOffset = useMemo(() => side * (0.14 + Math.random() * 0.03) * parentScale, [side, parentScale]);
+  const zOffset = useMemo(() => (Math.random() - 0.5) * 0.08 * parentScale, [parentScale]);
 
   useFrame((state) => {
-    const t = state.clock.elapsedTime + phase;
+    const t = state.clock.elapsedTime + phaseTime;
+    const cycleTime = t % 30; // Полный цикл 30 секунд
     
     if (dripGroupRef.current) {
-      const cycle = (Math.sin(t * 0.15) + 1) / 2; // Медленнее цикл
-      
-      if (cycle > 0.95 && !isActive) {
-        setIsActive(true);
-      } else if (cycle < 0.03 && isActive) {
-        setIsActive(false);
-      }
-      
-      if (isActive) {
-        const flowProgress = Math.min(1, ((t % 20) * 0.08)); // Ещё медленнее
-        const yPos = (startY - flowProgress * 2.2) * parentScale;
+      // ФАЗА 1: Накопление (0-8s) - воск собирается на краю
+      if (cycleTime < 8) {
+        setPhase('accumulating');
+        const accumProgress = cycleTime / 8;
+        setProgress(accumProgress);
         
-        dripGroupRef.current.position.y = yPos;
-        
-        // Более плавное растяжение
-        const stretchY = 1 + flowProgress * 3;
-        const shrinkXZ = Math.max(0.4, 1 - flowProgress * 0.6);
-        
-        dripGroupRef.current.scale.set(shrinkXZ, stretchY, shrinkXZ);
+        dripGroupRef.current.scale.set(
+          0.5 + accumProgress * 0.5,
+          0.3 + accumProgress * 0.7,
+          0.5 + accumProgress * 0.5
+        );
         
         dripGroupRef.current.children.forEach((child) => {
           if (child instanceof THREE.Mesh && child.material) {
-            (child.material as THREE.MeshStandardMaterial).opacity = Math.max(0, 0.9 - flowProgress * 1.1);
+            (child.material as THREE.MeshStandardMaterial).opacity = accumProgress * 0.9;
           }
         });
-      } else {
+      }
+      // ФАЗА 2: Стекание (8-20s) - капля медленно стекает, растягиваясь
+      else if (cycleTime < 20) {
+        setPhase('dripping');
+        const dripProgress = (cycleTime - 8) / 12;
+        setProgress(dripProgress);
+        
+        const yPos = (startY - dripProgress * 2.0) * parentScale;
+        dripGroupRef.current.position.y = yPos;
+        
+        // Растяжение капли при стекании (физика поверхностного натяжения)
+        const stretchY = 1 + dripProgress * 4.5; // Сильное вытягивание
+        const shrinkXZ = Math.max(0.35, 1 - dripProgress * 0.65);
+        dripGroupRef.current.scale.set(shrinkXZ, stretchY, shrinkXZ);
+        
+        // След воска на теле свечи
+        if (trailRef.current && trailRef.current.material) {
+          trailRef.current.scale.y = 0.5 + dripProgress * 1.5;
+          (trailRef.current.material as THREE.MeshStandardMaterial).opacity = 0.6 * (1 - dripProgress * 0.3);
+        }
+        
+        dripGroupRef.current.children.forEach((child) => {
+          if (child instanceof THREE.Mesh && child.material) {
+            (child.material as THREE.MeshStandardMaterial).opacity = Math.max(0, 0.9 - dripProgress * 1.0);
+          }
+        });
+      }
+      // ФАЗА 3: Отрыв и падение (20-22s) - капля отрывается и быстро падает
+      else if (cycleTime < 22) {
+        setPhase('detaching');
+        const fallProgress = (cycleTime - 20) / 2;
+        
+        const yPos = (startY - 2.0 - fallProgress * 1.5) * parentScale;
+        dripGroupRef.current.position.y = yPos;
+        dripGroupRef.current.scale.set(0.8, 0.8 + fallProgress, 0.8);
+        
+        dripGroupRef.current.children.forEach((child) => {
+          if (child instanceof THREE.Mesh && child.material) {
+            (child.material as THREE.MeshStandardMaterial).opacity = Math.max(0, 0.5 - fallProgress * 2);
+          }
+        });
+      }
+      // ФАЗА 4: Сброс (22-30s) - подготовка к новому циклу
+      else {
+        setPhase('reset');
         dripGroupRef.current.position.y = startY * parentScale;
-        dripGroupRef.current.scale.set(1, 1, 1);
+        dripGroupRef.current.scale.set(0.5, 0.3, 0.5);
         
         dripGroupRef.current.children.forEach((child) => {
           if (child instanceof THREE.Mesh && child.material) {
             (child.material as THREE.MeshStandardMaterial).opacity = 0;
           }
         });
+        
+        if (trailRef.current && trailRef.current.material) {
+          (trailRef.current.material as THREE.MeshStandardMaterial).opacity = 0;
+        }
       }
     }
   });
 
-  const xOffset = side * 0.17 * parentScale;
-  const zOffset = (Math.random() - 0.5) * 0.14 * parentScale;
-
   return (
-    <group ref={dripGroupRef} position={[xOffset, startY * parentScale, zOffset]}>
-      {/* Основная капля с более реалистичной формой */}
-      <mesh position={[0, -0.02 * parentScale, 0]}>
-        <capsuleGeometry args={[0.02 * parentScale, 0.1 * parentScale, 6, 10]} />
+    <>
+      {/* След воска на теле свечи */}
+      <mesh ref={trailRef} position={[xOffset, (startY - 0.5) * parentScale, zOffset]}>
+        <cylinderGeometry args={[0.012 * parentScale, 0.018 * parentScale, 1.0 * parentScale, 8]} />
         <meshStandardMaterial 
-          color="#4a3020" 
-          roughness={0.25} 
-          metalness={0.1}
+          color="#4a3520" 
+          roughness={0.35} 
+          metalness={0.08}
           transparent
           opacity={0}
           emissive="#2a1505"
-          emissiveIntensity={0.4}
+          emissiveIntensity={0.25}
         />
       </mesh>
       
-      {/* Верхняя часть - место отрыва */}
-      <mesh position={[0, 0.04 * parentScale, 0]}>
-        <sphereGeometry args={[0.025 * parentScale, 10, 10]} />
-        <meshStandardMaterial 
-          color="#5a4030" 
-          roughness={0.2} 
-          metalness={0.15}
-          transparent
-          opacity={0}
-          emissive="#3a2010"
-          emissiveIntensity={0.35}
-        />
-      </mesh>
-      
-      {/* Тонкий "мостик" воска */}
-      <mesh position={[0, 0.06 * parentScale, 0]}>
-        <cylinderGeometry args={[0.008 * parentScale, 0.015 * parentScale, 0.04 * parentScale, 8]} />
-        <meshStandardMaterial 
-          color="#5a4030" 
-          roughness={0.2} 
-          metalness={0.12}
-          transparent
-          opacity={0}
-          emissive="#3a2010"
-          emissiveIntensity={0.3}
-        />
-      </mesh>
-    </group>
+      {/* Группа капли */}
+      <group ref={dripGroupRef} position={[xOffset, startY * parentScale, zOffset]}>
+        {/* Основное тело капли - слеза */}
+        <mesh position={[0, -0.03 * parentScale, 0]}>
+          <sphereGeometry args={[0.028 * parentScale, 12, 12]} />
+          <meshStandardMaterial 
+            color="#4a3020" 
+            roughness={0.2} 
+            metalness={0.12}
+            transparent
+            opacity={0}
+            emissive="#3a2010"
+            emissiveIntensity={0.35}
+          />
+        </mesh>
+        
+        {/* Вытянутый хвост капли */}
+        <mesh position={[0, 0.02 * parentScale, 0]} rotation={[0, 0, Math.PI]}>
+          <coneGeometry args={[0.015 * parentScale, 0.08 * parentScale, 8]} />
+          <meshStandardMaterial 
+            color="#5a4030" 
+            roughness={0.18} 
+            metalness={0.15}
+            transparent
+            opacity={0}
+            emissive="#3a2010"
+            emissiveIntensity={0.3}
+          />
+        </mesh>
+        
+        {/* Точка соединения со свечой */}
+        <mesh position={[0, 0.06 * parentScale, 0]}>
+          <sphereGeometry args={[0.012 * parentScale, 8, 8]} />
+          <meshStandardMaterial 
+            color="#5a4030" 
+            roughness={0.15} 
+            metalness={0.18}
+            transparent
+            opacity={0}
+            emissive="#3a2010"
+            emissiveIntensity={0.4}
+          />
+        </mesh>
+      </group>
+    </>
   );
 }
 
