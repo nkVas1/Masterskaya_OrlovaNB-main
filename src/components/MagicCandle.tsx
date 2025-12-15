@@ -52,76 +52,102 @@ function FadeInScale({
   return <group ref={groupRef}>{children}</group>;
 }
 
-// --- УЛУЧШЕННЫЕ ЧАСТИЦЫ БЕЗ АРТЕФАКТОВ ---
+// --- КРАСИВЫЕ ЧАСТИЦЫ С СОЛНЕЧНЫМ СВЕЧЕНИЕМ ---
 function CustomSparkles({ 
   count = 50, 
   color = "#FFD700",
-  size = 0.03,
+  size = 0.05,
   spread = 5,
-  speed = 0.3
+  speed = 0.3,
+  position = [0, 0, 0] as [number, number, number]
 }: {
   count?: number,
   color?: string,
   size?: number,
   spread?: number,
-  speed?: number
+  speed?: number,
+  position?: [number, number, number]
 }) {
-  const pointsRef = useRef<THREE.Points>(null);
+  const groupRef = useRef<THREE.Group>(null);
   
-  const [positions, scales] = useMemo(() => {
-    const pos = new Float32Array(count * 3);
-    const scl = new Float32Array(count);
-    
-    for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * spread;
-      pos[i * 3 + 1] = (Math.random() - 0.5) * spread;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * spread;
-      scl[i] = Math.random() * 0.5 + 0.5;
-    }
-    
-    return [pos, scl];
+  const particles = useMemo(() => {
+    return Array.from({ length: count }, (_, i) => ({
+      position: [
+        (Math.random() - 0.5) * spread,
+        (Math.random() - 0.5) * spread,
+        (Math.random() - 0.5) * spread
+      ] as [number, number, number],
+      scale: Math.random() * 0.5 + 0.5,
+      phase: Math.random() * Math.PI * 2,
+      speed: 0.5 + Math.random() * 0.5
+    }));
   }, [count, spread]);
 
   useFrame((state) => {
-    if (pointsRef.current) {
+    if (groupRef.current) {
       const t = state.clock.elapsedTime * speed;
       
-      for (let i = 0; i < count; i++) {
-        const i3 = i * 3;
-        positions[i3 + 1] += Math.sin(t + i) * 0.001;
-      }
+      groupRef.current.children.forEach((child, i) => {
+        const particle = particles[i];
+        const oscillation = Math.sin(t * particle.speed + particle.phase) * 0.02;
+        
+        child.position.y = particle.position[1] + oscillation;
+        
+        // Мерцание
+        if (child instanceof THREE.Mesh && child.material) {
+          const mat = child.material as THREE.MeshBasicMaterial;
+          mat.opacity = 0.6 + Math.sin(t * 2 + particle.phase) * 0.3;
+        }
+      });
       
-      pointsRef.current.geometry.attributes.position.needsUpdate = true;
-      pointsRef.current.rotation.y = t * 0.05;
+      groupRef.current.rotation.y = t * 0.03;
     }
   });
 
   return (
-    <points ref={pointsRef}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={count}
-          array={positions}
-          itemSize={3}
-        />
-        <bufferAttribute
-          attach="attributes-scale"
-          count={count}
-          array={scales}
-          itemSize={1}
-        />
-      </bufferGeometry>
-      <pointsMaterial
-        size={size}
-        color={color}
-        transparent
-        opacity={0.8}
-        sizeAttenuation
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-      />
-    </points>
+    <group ref={groupRef} position={position}>
+      {particles.map((particle, i) => (
+        <group key={i} position={particle.position}>
+          {/* Центральное яркое ядро */}
+          <mesh>
+            <sphereGeometry args={[size * particle.scale, 8, 8]} />
+            <meshBasicMaterial 
+              color={color}
+              transparent
+              opacity={0.9}
+              toneMapped={false}
+              depthWrite={false}
+            />
+          </mesh>
+          
+          {/* Среднее свечение */}
+          <mesh>
+            <sphereGeometry args={[size * particle.scale * 2, 8, 8]} />
+            <meshBasicMaterial 
+              color={color}
+              transparent
+              opacity={0.4}
+              toneMapped={false}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+            />
+          </mesh>
+          
+          {/* Внешнее солнечное гало */}
+          <mesh>
+            <sphereGeometry args={[size * particle.scale * 3.5, 8, 8]} />
+            <meshBasicMaterial 
+              color={color}
+              transparent
+              opacity={0.15}
+              toneMapped={false}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+            />
+          </mesh>
+        </group>
+      ))}
+    </group>
   );
 }
 
@@ -138,32 +164,36 @@ function WaxDrip({
   const dripGroupRef = useRef<THREE.Group>(null);
   const [isActive, setIsActive] = useState(false);
   const phase = useMemo(() => Math.random() * 100 + delay, [delay]);
-  const startY = useMemo(() => 0.4 + Math.random() * 0.2, []);
+  // ИЗМЕНЕНО: капля начинается ниже, на уровне верха тела свечи
+  const startY = useMemo(() => 0.15 + Math.random() * 0.1, []);
 
   useFrame((state) => {
     const t = state.clock.elapsedTime + phase;
     
     if (dripGroupRef.current) {
-      const cycle = (Math.sin(t * 0.2) + 1) / 2;
+      const cycle = (Math.sin(t * 0.15) + 1) / 2; // Медленнее цикл
       
-      if (cycle > 0.92 && !isActive) {
+      if (cycle > 0.95 && !isActive) {
         setIsActive(true);
-      } else if (cycle < 0.08 && isActive) {
+      } else if (cycle < 0.03 && isActive) {
         setIsActive(false);
       }
       
       if (isActive) {
-        const flowProgress = Math.min(1, ((t % 15) * 0.1));
-        const yPos = (startY - flowProgress * 1.8) * parentScale;
+        const flowProgress = Math.min(1, ((t % 20) * 0.08)); // Ещё медленнее
+        const yPos = (startY - flowProgress * 2.2) * parentScale;
         
         dripGroupRef.current.position.y = yPos;
-        dripGroupRef.current.scale.y = 1 + flowProgress * 2; // Растягивается вниз
-        dripGroupRef.current.scale.x = Math.max(0.3, 1 - flowProgress * 0.7);
-        dripGroupRef.current.scale.z = Math.max(0.3, 1 - flowProgress * 0.7);
+        
+        // Более плавное растяжение
+        const stretchY = 1 + flowProgress * 3;
+        const shrinkXZ = Math.max(0.4, 1 - flowProgress * 0.6);
+        
+        dripGroupRef.current.scale.set(shrinkXZ, stretchY, shrinkXZ);
         
         dripGroupRef.current.children.forEach((child) => {
-          if (child instanceof THREE.Mesh) {
-            (child.material as THREE.MeshStandardMaterial).opacity = Math.max(0, 1 - flowProgress * 1.2);
+          if (child instanceof THREE.Mesh && child.material) {
+            (child.material as THREE.MeshStandardMaterial).opacity = Math.max(0, 0.9 - flowProgress * 1.1);
           }
         });
       } else {
@@ -171,7 +201,7 @@ function WaxDrip({
         dripGroupRef.current.scale.set(1, 1, 1);
         
         dripGroupRef.current.children.forEach((child) => {
-          if (child instanceof THREE.Mesh) {
+          if (child instanceof THREE.Mesh && child.material) {
             (child.material as THREE.MeshStandardMaterial).opacity = 0;
           }
         });
@@ -179,36 +209,50 @@ function WaxDrip({
     }
   });
 
-  const xOffset = side * 0.16 * parentScale;
-  const zOffset = (Math.random() - 0.5) * 0.12 * parentScale;
+  const xOffset = side * 0.17 * parentScale;
+  const zOffset = (Math.random() - 0.5) * 0.14 * parentScale;
 
   return (
     <group ref={dripGroupRef} position={[xOffset, startY * parentScale, zOffset]}>
-      {/* Капля воска - вытянутая форма */}
-      <mesh position={[0, 0, 0]}>
-        <capsuleGeometry args={[0.025 * parentScale, 0.08 * parentScale, 4, 8]} />
+      {/* Основная капля с более реалистичной формой */}
+      <mesh position={[0, -0.02 * parentScale, 0]}>
+        <capsuleGeometry args={[0.02 * parentScale, 0.1 * parentScale, 6, 10]} />
         <meshStandardMaterial 
           color="#4a3020" 
-          roughness={0.3} 
+          roughness={0.25} 
+          metalness={0.1}
+          transparent
+          opacity={0}
+          emissive="#2a1505"
+          emissiveIntensity={0.4}
+        />
+      </mesh>
+      
+      {/* Верхняя часть - место отрыва */}
+      <mesh position={[0, 0.04 * parentScale, 0]}>
+        <sphereGeometry args={[0.025 * parentScale, 10, 10]} />
+        <meshStandardMaterial 
+          color="#5a4030" 
+          roughness={0.2} 
           metalness={0.15}
           transparent
           opacity={0}
           emissive="#3a2010"
-          emissiveIntensity={0.3}
+          emissiveIntensity={0.35}
         />
       </mesh>
       
-      {/* Хвостик капли */}
-      <mesh position={[0, 0.05 * parentScale, 0]}>
-        <sphereGeometry args={[0.015 * parentScale, 8, 8]} />
+      {/* Тонкий "мостик" воска */}
+      <mesh position={[0, 0.06 * parentScale, 0]}>
+        <cylinderGeometry args={[0.008 * parentScale, 0.015 * parentScale, 0.04 * parentScale, 8]} />
         <meshStandardMaterial 
           color="#5a4030" 
-          roughness={0.25} 
-          metalness={0.2}
+          roughness={0.2} 
+          metalness={0.12}
           transparent
           opacity={0}
           emissive="#3a2010"
-          emissiveIntensity={0.2}
+          emissiveIntensity={0.3}
         />
       </mesh>
     </group>
@@ -273,6 +317,30 @@ function CinematicCandle({
             <WaxDrip parentScale={scale} side={0.5} delay={6} />
           </>
         )}
+
+        {/* Тело свечи - более объемное и детальное */}
+        {/* Застывшие восковые потёки на теле */}
+        <mesh position={[0.14 * scale, 0.1 * scale, 0.08 * scale]} castShadow>
+          <capsuleGeometry args={[0.018 * scale, 0.15 * scale, 4, 8]} />
+          <meshStandardMaterial 
+            color="#3a2515" 
+            roughness={0.4} 
+            metalness={0.1}
+            emissive="#2a1505"
+            emissiveIntensity={0.15}
+          />
+        </mesh>
+        
+        <mesh position={[-0.12 * scale, -0.05 * scale, -0.09 * scale]} castShadow>
+          <capsuleGeometry args={[0.015 * scale, 0.12 * scale, 4, 8]} />
+          <meshStandardMaterial 
+            color="#3a2515" 
+            roughness={0.4} 
+            metalness={0.1}
+            emissive="#2a1505"
+            emissiveIntensity={0.15}
+          />
+        </mesh>
 
         {/* Фитиль */}
         <mesh position={[0, 0.25 * scale, 0]}>
@@ -534,20 +602,21 @@ export default function MagicCandleScene() {
         
         <ResponsiveCandleGroup />
         
-        {/* Золотые частицы - чистая система без артефактов */}
+        {/* Золотые частицы - солнечное сияние */}
         <CustomSparkles 
-          count={100} 
+          count={90} 
           color="#FFD700" 
-          size={0.04} 
+          size={0.035} 
           spread={8} 
-          speed={0.3}
+          speed={0.35}
+          position={[0, 0.5, 0.5]}
         />
         
-        {/* Магическая пыль (фиолетовая) - мистическое сияние */}
+        {/* Фиолетовая мистическая пыль - меньше и тоньше */}
         <CustomSparkles 
-          count={80} 
+          count={60} 
           color="#8b5cf6" 
-          size={0.02} 
+          size={0.015} 
           spread={6} 
           speed={0.2}
         />
