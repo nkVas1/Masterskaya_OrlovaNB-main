@@ -643,7 +643,7 @@ export default function MagicCandleScene() {
         <CinematicRig />
 
         {/* Кинематографичная пост-обработка */}
-        <EffectComposer disableNormalPass>
+        <EffectComposer enableNormalPass={false}>
           <Bloom 
             luminanceThreshold={1.0} 
             mipmapBlur 
@@ -658,7 +658,9 @@ export default function MagicCandleScene() {
             height={480}
           />
           <ChromaticAberration 
-            offset={[0.0008, 0.0008] as [number, number]}
+            offset={new THREE.Vector2(0.0008, 0.0008)}
+            radialModulation={false}
+            modulationOffset={0}
             blendFunction={BlendFunction.NORMAL}
           />
           <Noise opacity={0.04} />
