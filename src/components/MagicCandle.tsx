@@ -52,11 +52,11 @@ function FadeInScale({
   return <group ref={groupRef}>{children}</group>;
 }
 
-// --- КОМПАКТНЫЕ ЗВЁЗДНЫЕ ЧАСТИЦЫ С ГРАДИЕНТНЫМ СВЕЧЕНИЕМ ---
+// --- БЕСШОВНЫЕ КИНЕМАТОГРАФИЧНЫЕ ЧАСТИЦЫ ---
 function CustomSparkles({ 
   count = 50, 
   color = "#FFD700",
-  size = 0.02,
+  size = 0.015,
   spread = 5,
   speed = 0.3,
   position = [0, 0, 0] as [number, number, number]
@@ -78,13 +78,13 @@ function CustomSparkles({
         (Math.random() - 0.5) * spread
       ] as [number, number, number],
       velocity: [
-        (Math.random() - 0.5) * 0.015,
-        (Math.random() - 0.5) * 0.015,
-        (Math.random() - 0.5) * 0.015
+        (Math.random() - 0.5) * 0.012,
+        (Math.random() - 0.5) * 0.012,
+        (Math.random() - 0.5) * 0.012
       ] as [number, number, number],
-      scale: 0.7 + Math.random() * 0.6,
+      scale: 0.6 + Math.random() * 0.8,
       phase: Math.random() * Math.PI * 2,
-      flickerSpeed: 0.9 + Math.random() * 0.3
+      flickerSpeed: 0.85 + Math.random() * 0.35
     }));
   }, [count, spread]);
 
@@ -95,10 +95,10 @@ function CustomSparkles({
       groupRef.current.children.forEach((child, i) => {
         const particle = particles[i];
         
-        // Плавающее движение
-        const offsetX = particle.initialPos[0] + Math.sin(t * particle.flickerSpeed + particle.phase) * 0.25;
-        const offsetY = particle.initialPos[1] + Math.cos(t * particle.flickerSpeed * 0.8 + particle.phase) * 0.25;
-        const offsetZ = particle.initialPos[2] + Math.sin(t * particle.flickerSpeed * 0.6 + particle.phase) * 0.18;
+        // Плавное хаотичное движение
+        const offsetX = particle.initialPos[0] + Math.sin(t * particle.flickerSpeed + particle.phase) * 0.22;
+        const offsetY = particle.initialPos[1] + Math.cos(t * particle.flickerSpeed * 0.75 + particle.phase) * 0.22;
+        const offsetZ = particle.initialPos[2] + Math.sin(t * particle.flickerSpeed * 0.55 + particle.phase) * 0.16;
         
         child.position.set(
           offsetX + particle.velocity[0] * t,
@@ -111,22 +111,31 @@ function CustomSparkles({
         if (Math.abs(child.position.y) > spread * 0.6) particle.velocity[1] *= -1;
         if (Math.abs(child.position.z) > spread * 0.6) particle.velocity[2] *= -1;
         
-        // Мерцание с градацией по слоям
+        // Естественное мерцание всех слоёв синхронно
         if (child instanceof THREE.Group) {
+          const baseFlicker = 0.7 + Math.sin(t * 2.2 * particle.flickerSpeed + particle.phase) * 0.3;
+          
           child.children.forEach((mesh, idx) => {
             if (mesh instanceof THREE.Mesh && mesh.material) {
               const mat = mesh.material as THREE.MeshBasicMaterial;
-              const baseFlicker = 0.75 + Math.sin(t * 2.5 * particle.flickerSpeed + particle.phase) * 0.25;
               
-              // Градиентное затухание от центра к краям
-              const opacities = [0.25, 0.95, 0.45, 0.18, 0.08]; // 5 слоёв
-              mat.opacity = opacities[idx] * baseFlicker;
+              // Плавный экспоненциальный градиент от центра
+              // 0: ядро, 1-9: постепенное затухание
+              let baseOpacity: number;
+              if (idx === 0) {
+                baseOpacity = 0.88; // Яркое но слегка прозрачное ядро
+              } else {
+                // Экспоненциальное затухание: каждый слой в 1.65x слабее
+                baseOpacity = 0.5 / Math.pow(1.65, idx - 1);
+              }
+              
+              mat.opacity = baseOpacity * baseFlicker;
             }
           });
         }
       });
       
-      groupRef.current.rotation.y = t * 0.04;
+      groupRef.current.rotation.y = t * 0.035;
     }
   });
 
@@ -134,70 +143,33 @@ function CustomSparkles({
     <group ref={groupRef} position={position}>
       {particles.map((particle, i) => (
         <group key={i} position={particle.initialPos}>
-          {/* Слой 1: Слабая пустота в центре */}
+          {/* Микроскопическое яркое ядро - единственная полунепрозрачная часть */}
           <mesh>
-            <sphereGeometry args={[size * particle.scale * 0.2, 8, 8]} />
+            <sphereGeometry args={[size * particle.scale * 0.35, 10, 10]} />
             <meshBasicMaterial 
               color={color}
               transparent
-              opacity={0.25}
+              opacity={0.88}
               toneMapped={false}
               depthWrite={false}
               blending={THREE.AdditiveBlending}
             />
           </mesh>
           
-          {/* Слой 2: Яркое компактное ядро */}
-          <mesh>
-            <sphereGeometry args={[size * particle.scale * 0.6, 12, 12]} />
-            <meshBasicMaterial 
-              color={color}
-              transparent
-              opacity={0.95}
-              toneMapped={false}
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-            />
-          </mesh>
-          
-          {/* Слой 3: Первое рассеивание */}
-          <mesh>
-            <sphereGeometry args={[size * particle.scale * 1.5, 12, 12]} />
-            <meshBasicMaterial 
-              color={color}
-              transparent
-              opacity={0.45}
-              toneMapped={false}
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-            />
-          </mesh>
-          
-          {/* Слой 4: Среднее затухание */}
-          <mesh>
-            <sphereGeometry args={[size * particle.scale * 2.8, 16, 16]} />
-            <meshBasicMaterial 
-              color={color}
-              transparent
-              opacity={0.18}
-              toneMapped={false}
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-            />
-          </mesh>
-          
-          {/* Слой 5: Мягкое внешнее гало (fade edge) */}
-          <mesh>
-            <sphereGeometry args={[size * particle.scale * 4.5, 16, 16]} />
-            <meshBasicMaterial 
-              color={color}
-              transparent
-              opacity={0.08}
-              toneMapped={false}
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-            />
-          </mesh>
+          {/* Плавные слои рассеивания - создают бесшовный градиент */}
+          {[0.7, 1.1, 1.6, 2.3, 3.2, 4.3, 5.8, 7.5, 9.5].map((multiplier, idx) => (
+            <mesh key={idx}>
+              <sphereGeometry args={[size * particle.scale * multiplier, 14, 14]} />
+              <meshBasicMaterial 
+                color={color}
+                transparent
+                opacity={0.5 / Math.pow(1.65, idx)} // Экспоненциальное затухание
+                toneMapped={false}
+                depthWrite={false}
+                blending={THREE.AdditiveBlending}
+              />
+            </mesh>
+          ))}
         </group>
       ))}
     </group>
@@ -219,7 +191,7 @@ function WaxDrip({
   const [phase, setPhase] = useState<'accumulating' | 'dripping' | 'detaching' | 'reset'>('reset');
   const [progress, setProgress] = useState(0);
   const phaseTime = useMemo(() => Math.random() * 100 + delay, [delay]);
-  const startY = 0.23; // Верхний край свечи
+  const startY = 0.72; // Верхний край свечи (75 см от центра)
   const xOffset = useMemo(() => side * (0.14 + Math.random() * 0.03) * parentScale, [side, parentScale]);
   const zOffset = useMemo(() => (Math.random() - 0.5) * 0.08 * parentScale, [parentScale]);
 
@@ -252,7 +224,7 @@ function WaxDrip({
         const dripProgress = (cycleTime - 8) / 12;
         setProgress(dripProgress);
         
-        const yPos = (startY - dripProgress * 2.0) * parentScale;
+        const yPos = startY * parentScale - dripProgress * 2.0 * parentScale;
         dripGroupRef.current.position.y = yPos;
         
         // Растяжение капли при стекании (физика поверхностного натяжения)
@@ -277,7 +249,7 @@ function WaxDrip({
         setPhase('detaching');
         const fallProgress = (cycleTime - 20) / 2;
         
-        const yPos = (startY - 2.0 - fallProgress * 1.5) * parentScale;
+        const yPos = startY * parentScale - (2.0 + fallProgress * 1.5) * parentScale;
         dripGroupRef.current.position.y = yPos;
         dripGroupRef.current.scale.set(0.8, 0.8 + fallProgress, 0.8);
         
@@ -309,7 +281,7 @@ function WaxDrip({
   return (
     <>
       {/* След воска на теле свечи */}
-      <mesh ref={trailRef} position={[xOffset, (startY - 0.5) * parentScale, zOffset]}>
+      <mesh ref={trailRef} position={[xOffset, 0.2 * parentScale, zOffset]}>
         <cylinderGeometry args={[0.012 * parentScale, 0.018 * parentScale, 1.0 * parentScale, 8]} />
         <meshStandardMaterial 
           color="#4a3520" 
@@ -431,25 +403,36 @@ function CinematicCandle({
 
         {/* Тело свечи - более объемное и детальное */}
         {/* Застывшие восковые потёки на теле */}
-        <mesh position={[0.14 * scale, 0.1 * scale, 0.08 * scale]} castShadow>
-          <capsuleGeometry args={[0.018 * scale, 0.15 * scale, 4, 8]} />
+        <mesh position={[0.13 * scale, 0.35 * scale, 0.07 * scale]} castShadow rotation={[0, 0, -0.3]}>
+          <capsuleGeometry args={[0.015 * scale, 0.25 * scale, 6, 10]} />
           <meshStandardMaterial 
             color="#3a2515" 
-            roughness={0.4} 
-            metalness={0.1}
+            roughness={0.35} 
+            metalness={0.12}
             emissive="#2a1505"
-            emissiveIntensity={0.15}
+            emissiveIntensity={0.2}
           />
         </mesh>
         
-        <mesh position={[-0.12 * scale, -0.05 * scale, -0.09 * scale]} castShadow>
-          <capsuleGeometry args={[0.015 * scale, 0.12 * scale, 4, 8]} />
+        <mesh position={[-0.11 * scale, 0.2 * scale, -0.08 * scale]} castShadow rotation={[0, 0, 0.25]}>
+          <capsuleGeometry args={[0.012 * scale, 0.18 * scale, 6, 10]} />
           <meshStandardMaterial 
             color="#3a2515" 
-            roughness={0.4} 
-            metalness={0.1}
+            roughness={0.35} 
+            metalness={0.12}
             emissive="#2a1505"
-            emissiveIntensity={0.15}
+            emissiveIntensity={0.2}
+          />
+        </mesh>
+        
+        <mesh position={[0.08 * scale, 0.1 * scale, 0.12 * scale]} castShadow rotation={[0, 0, -0.15]}>
+          <capsuleGeometry args={[0.01 * scale, 0.12 * scale, 6, 8]} />
+          <meshStandardMaterial 
+            color="#4a3020" 
+            roughness={0.3} 
+            metalness={0.15}
+            emissive="#2a1505"
+            emissiveIntensity={0.18}
           />
         </mesh>
 
@@ -713,24 +696,24 @@ export default function MagicCandleScene() {
         
         <ResponsiveCandleGroup />
         
-        {/* Золотые частицы - компактные звёзды */}
+        {/* Золотые частицы - мягкое кинематографичное свечение */}
         <CustomSparkles 
-          count={110} 
+          count={120} 
           color="#FFD700" 
-          size={0.018} 
+          size={0.012} 
           spread={8} 
-          speed={0.32}
-          position={[0, 0.4, 0.3]}
+          speed={0.3}
+          position={[0, 0.3, 0.2]}
         />
         
-        {/* Фиолетовая мистическая пыль - микрочастицы */}
+        {/* Фиолетовая мистическая пыль - тончайшие частицы */}
         <CustomSparkles 
-          count={80} 
-          color="#9b6cf6" 
-          size={0.008} 
-          spread={6} 
-          speed={0.2}
-          position={[0, 0.1, -0.6]}
+          count={90} 
+          color="#a97cf6" 
+          size={0.006} 
+          spread={6.5} 
+          speed={0.18}
+          position={[0, 0.05, -0.7]}
         />
         
         <CinematicRig />
