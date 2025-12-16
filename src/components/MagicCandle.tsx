@@ -184,11 +184,11 @@ function CinematicCandle({
         <mesh position={[0, -0.5 * scale, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[0.15 * scale, 0.18 * scale, 1.5 * scale, 32]} />
           <meshStandardMaterial 
-            color="#1a0b00" 
-            roughness={0.8} 
-            metalness={0.05}
-            emissive="#220a00" 
-            emissiveIntensity={0.2}
+            color="#2a1a0f" 
+            roughness={0.75} 
+            metalness={0.08}
+            emissive="#3a2210" 
+            emissiveIntensity={0.35}
           />
         </mesh>
 
@@ -224,16 +224,16 @@ function CinematicCandle({
         {/* СТИЛИЗОВАННОЕ пламя - сферическое как раньше */}
         <mesh ref={flameRef} position={[0, 0.45 * scale, 0]}>
           <sphereGeometry args={[0.06 * scale, 16, 16]} />
-          <meshBasicMaterial color={[5, 2, 0.5]} toneMapped={false} />
+          <meshBasicMaterial color={[6, 2.5, 0.8]} toneMapped={false} />
         </mesh>
 
         {/* Точечный источник света */}
         <pointLight 
           ref={lightRef} 
           position={[0, 0.6 * scale, 0]} 
-          color="#ff7b00" 
-          intensity={1.5}
-          distance={3} 
+          color="#ff8c1a" 
+          intensity={2.2}
+          distance={4} 
           decay={2} 
           castShadow
         />
@@ -328,10 +328,10 @@ function CinematicPortalMirror() {
         {/* Глубокая подсветка портала */}
         <pointLight 
           position={[0, 0, -1]} 
-          intensity={5} 
+          intensity={2.5} 
           color="#4b0082" 
-          distance={5}
-          decay={2}
+          distance={4}
+          decay={2.2}
         />
       </group>
     </FadeInScale>
@@ -385,8 +385,9 @@ function VolumetricAtmosphere() {
     <>
       <fog attach="fog" args={["#050505", 5, 12]} />
       {/* Ambient occlusion через слабый свет */}
-      <ambientLight intensity={0.08} color="#1a1410" />
-      <hemisphereLight intensity={0.15} color="#ffd4a3" groundColor="#000000" />
+      <fog attach="fog" args={["#050505", 5, 12]} />
+      <ambientLight intensity={0.12} color="#1a1410" />
+      <hemisphereLight intensity={0.2} color="#ffd4a3" groundColor="#0a0a0a" />
     </>
   );
 }
@@ -461,7 +462,7 @@ export default function MagicCandleScene() {
         gl={{ 
           antialias: true,
           toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.2,
+          toneMappingExposure: 1.0,
         }}
       >
         <PerspectiveCamera makeDefault position={[0, 0, 4.8]} fov={52} />
@@ -477,9 +478,9 @@ export default function MagicCandleScene() {
         
         {/* Золотые частицы - живой динамичный свет */}
         <CustomSparkles 
-          count={150} 
-          color="#FFD700" 
-          size={0.006} 
+          count={140} 
+          color="#f4c542" 
+          size={0.005} 
           spread={9} 
           speed={0.3}
           position={[0, 0.3, 0]}
@@ -487,9 +488,9 @@ export default function MagicCandleScene() {
         
         {/* Фиолетовая магическая пыльца - микроскопические искорки */}
         <CustomSparkles 
-          count={130} 
-          color="#b794f6" 
-          size={0.0025} 
+          count={120} 
+          color="#9575cd" 
+          size={0.0022} 
           spread={7.5} 
           speed={0.18}
           position={[0, 0, -0.8]}
@@ -500,10 +501,10 @@ export default function MagicCandleScene() {
         {/* Кинематографичная пост-обработка */}
         <EffectComposer enableNormalPass={false}>
           <Bloom 
-            luminanceThreshold={0.2} 
+            luminanceThreshold={0.9} 
             mipmapBlur 
-            intensity={3.5} 
-            radius={1.2}
+            intensity={2.2} 
+            radius={0.8}
             levels={9}
           />
           <DepthOfField 
