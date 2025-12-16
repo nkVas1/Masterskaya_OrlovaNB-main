@@ -480,7 +480,7 @@ export default function MagicCandleScene() {
         <CustomSparkles 
           count={140} 
           color="#f4c542" 
-          size={0.005} 
+          size={0.0095} 
           spread={9} 
           speed={0.3}
           position={[0, 0.3, 0]}
@@ -490,7 +490,7 @@ export default function MagicCandleScene() {
         <CustomSparkles 
           count={120} 
           color="#9575cd" 
-          size={0.0022} 
+          size={0.0028} 
           spread={7.5} 
           speed={0.18}
           position={[0, 0, -0.8]}
