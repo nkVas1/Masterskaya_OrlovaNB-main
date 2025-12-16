@@ -49,7 +49,7 @@ const ParticleGradientMaterial = ({
             
             // Идеально плавное затухание с усилением в центре
             // smoothstep создаёт S-образную кривую без ступенек
-            float intensity = 1.0 - smoothstep(0.0, 0.5, dist);
+            float intensity = 1.0 - smoothstep(0.0, 2.0, dist);
             
             // Дополнительное усиление яркости к центру через pow
             intensity = pow(intensity, 8.0);
