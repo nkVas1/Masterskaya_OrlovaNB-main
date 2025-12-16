@@ -49,7 +49,7 @@ const ParticleGradientMaterial = ({
             
             // Идеально плавное затухание с усилением в центре
             // smoothstep создаёт S-образную кривую без ступенек
-            float intensity = 1.0 - smoothstep(0.0, 0.8, dist);
+            float intensity = 1.0 - smoothstep(0.0, 0.5, dist);
             
             // Дополнительное усиление яркости к центру через pow
             intensity = pow(intensity, 8.0);
@@ -536,7 +536,7 @@ export default function MagicCandleScene() {
         <CustomSparkles 
           count={140} 
           color="#f4c542" 
-          size={0.0009} 
+          size={0.001} 
           spread={9} 
           speed={0.3}
           position={[0, 0.3, 0]}
@@ -546,7 +546,7 @@ export default function MagicCandleScene() {
         <CustomSparkles 
           count={120} 
           color="#9575cd" 
-          size={0.0007} 
+          size={0.0004} 
           spread={7.5} 
           speed={0.18}
           position={[0, 0, -0.8]}
