@@ -52,7 +52,7 @@ const ParticleGradientMaterial = ({
             float intensity = 1.0 - smoothstep(0.0, 1.0, dist);
             
             // Дополнительное усиление яркости к центру через pow
-            intensity = pow(intensity, 2.2);
+            intensity = pow(intensity, 3.0);
             
             // Финальная прозрачность
             float alpha = intensity * opacity;
@@ -536,7 +536,7 @@ export default function MagicCandleScene() {
         <CustomSparkles 
           count={140} 
           color="#f4c542" 
-          size={0.0045} 
+          size={0.0009} 
           spread={9} 
           speed={0.3}
           position={[0, 0.3, 0]}
@@ -546,7 +546,7 @@ export default function MagicCandleScene() {
         <CustomSparkles 
           count={120} 
           color="#9575cd" 
-          size={0.002} 
+          size={0.0007} 
           spread={7.5} 
           speed={0.18}
           position={[0, 0, -0.8]}
