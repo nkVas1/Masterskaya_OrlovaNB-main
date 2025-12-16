@@ -13,6 +13,70 @@ import { EffectComposer, Bloom, Noise, Vignette, ChromaticAberration, DepthOfFie
 import { BlendFunction } from "postprocessing";
 import * as THREE from "three";
 
+// --- КАСТОМНЫЙ ШЕЙДЕР ДЛЯ ИДЕАЛЬНО ПЛАВНОГО ГРАДИЕНТА ---
+const ParticleGradientMaterial = ({
+  color,
+  opacity
+}: {
+  color: string;
+  opacity: number;
+}) => {
+  const materialRef = useRef<THREE.ShaderMaterial>(null);
+
+  const shaderMaterial = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: {
+          color: { value: new THREE.Color(color) },
+          opacity: { value: opacity }
+        },
+        vertexShader: `
+          varying vec3 vPosition;
+          
+          void main() {
+            vPosition = position;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 color;
+          uniform float opacity;
+          varying vec3 vPosition;
+          
+          void main() {
+            // Нормализованное расстояние от центра (0.0 в центре, 1.0 на краю сферы)
+            float dist = length(vPosition);
+            
+            // Идеально плавное затухание с усилением в центре
+            // smoothstep создаёт S-образную кривую без ступенек
+            float intensity = 1.0 - smoothstep(0.0, 1.0, dist);
+            
+            // Дополнительное усиление яркости к центру через pow
+            intensity = pow(intensity, 2.2);
+            
+            // Финальная прозрачность
+            float alpha = intensity * opacity;
+            
+            gl_FragColor = vec4(color, alpha);
+          }
+        `,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+      }),
+    [color, opacity]
+  );
+
+  useFrame(() => {
+    if (materialRef.current) {
+      materialRef.current.uniforms.opacity.value = opacity;
+    }
+  });
+
+  return <primitive ref={materialRef} object={shaderMaterial} attach="material" />;
+};
+
 // --- АНИМАЦИЯ ПОЯВЛЕНИЯ ЭЛЕМЕНТА ---
 function FadeInScale({ 
   children, 
@@ -52,7 +116,7 @@ function FadeInScale({
   return <group ref={groupRef}>{children}</group>;
 }
 
-// --- МИНИМАЛИСТИЧНЫЕ ЖИВЫЕ ЧАСТИЦЫ СВЕТА ---
+// --- ШЕЙДЕР-Based ЧАСТИЦЫ С ИДЕАЛЬНО ПЛАВНЫМ ГРАДИЕНТОМ ---
 function CustomSparkles({ 
   count = 50, 
   color = "#FFD700",
@@ -84,7 +148,8 @@ function CustomSparkles({
       ] as [number, number, number],
       scale: 0.65 + Math.random() * 0.7,
       phase: Math.random() * Math.PI * 2,
-      flickerSpeed: 0.75 + Math.random() * 0.5
+      flickerSpeed: 0.75 + Math.random() * 0.5,
+      opacity: 0.65
     }));
   }, [count, spread]);
 
@@ -111,11 +176,9 @@ function CustomSparkles({
         if (Math.abs(child.position.y) > spread * 0.6) particle.velocity[1] *= -1;
         if (Math.abs(child.position.z) > spread * 0.6) particle.velocity[2] *= -1;
         
-        // Динамичное мерцание
-        if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
-          const flicker = 0.65 + Math.sin(t * 2.2 * particle.flickerSpeed + particle.phase) * 0.35;
-          child.material.opacity = flicker;
-        }
+        // Динамичное мерцание через шейдер
+        const flicker = 0.65 + Math.sin(t * 2.2 * particle.flickerSpeed + particle.phase) * 0.35;
+        particle.opacity = flicker;
       });
       
       groupRef.current.rotation.y = t * 0.03;
@@ -126,15 +189,8 @@ function CustomSparkles({
     <group ref={groupRef} position={position}>
       {particles.map((particle, i) => (
         <mesh key={i} position={particle.initialPos}>
-          <sphereGeometry args={[size * particle.scale, 8, 8]} />
-          <meshBasicMaterial 
-            color={color}
-            transparent
-            opacity={0.65}
-            toneMapped={false}
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-          />
+          <sphereGeometry args={[size * particle.scale * 8, 16, 16]} />
+          <ParticleGradientMaterial color={color} opacity={particle.opacity} />
         </mesh>
       ))}
     </group>
@@ -476,21 +532,21 @@ export default function MagicCandleScene() {
         
         <ResponsiveCandleGroup />
         
-        {/* Золотые частицы - живой динамичный свет */}
+        {/* Золотые частицы - идеально плавный градиент */}
         <CustomSparkles 
           count={140} 
           color="#f4c542" 
-          size={0.0095} 
+          size={0.0045} 
           spread={9} 
           speed={0.3}
           position={[0, 0.3, 0]}
         />
         
-        {/* Фиолетовая магическая пыльца - микроскопические искорки */}
+        {/* Фиолетовая магическая пыльца - микроскопическая с градиентом */}
         <CustomSparkles 
           count={120} 
           color="#9575cd" 
-          size={0.0028} 
+          size={0.002} 
           spread={7.5} 
           speed={0.18}
           position={[0, 0, -0.8]}
